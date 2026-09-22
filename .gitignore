@@ -1,0 +1,19 @@
+# Python virtual environment
+.venv/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Environment variables and private API keys
+.env
+
+# Generated data and trained models
+data/*.csv
+data/*.parquet
+models/*.pkl
+models/*.joblib
+
+# Testing and editor files
+.pytest_cache/
+.vscode/
