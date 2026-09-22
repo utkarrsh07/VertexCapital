@@ -27,6 +27,7 @@ def make_prices(days=400):
             "MSFT": 120 * (1.0008 ** np.arange(days)),
             "GOOGL": 90 * (1.0006 ** np.arange(days)),
             "SPY": 200 * (1.0007 ** np.arange(days)),
+            "XEQT.TO": 150 * (1.0005 ** np.arange(days)),
         },
         index=dates,
     )
@@ -171,6 +172,7 @@ def test_backtest_applies_weights_on_following_day():
         {
             "AAPL": [100.0, 110.0, 121.0, 121.0],
             "SPY": [100.0, 100.0, 100.0, 100.0],
+            "XEQT.TO": [100.0, 100.0, 100.0, 100.0],
         },
         index=dates,
     )
@@ -200,6 +202,7 @@ def test_transaction_cost_reduces_net_return():
         {
             "AAPL": [100.0, 100.0, 100.0],
             "SPY": [100.0, 100.0, 100.0],
+            "XEQT.TO": [100.0, 100.0, 100.0],
         },
         index=dates,
     )
@@ -233,6 +236,7 @@ def test_zero_transaction_cost_makes_net_equal_gross():
         {
             "AAPL": [100.0, 101.0, 102.0, 103.0],
             "SPY": [100.0, 100.0, 100.0, 100.0],
+            "XEQT.TO": [100.0, 100.0, 100.0, 100.0],
         },
         index=dates,
     )
@@ -265,6 +269,7 @@ def test_portfolio_value_matches_compounded_returns():
         {
             "AAPL": [100.0, 100.0, 110.0, 121.0],
             "SPY": [100.0, 100.0, 100.0, 100.0],
+            "XEQT.TO": [100.0, 100.0, 100.0, 100.0],
         },
         index=dates,
     )

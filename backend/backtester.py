@@ -87,8 +87,20 @@ def run_backtest(
     weights: pd.DataFrame,
     transaction_cost_bps=10,
     benchmark="SPY",
+    secondary_benchmark="XEQT.TO",
 ) -> tuple[pd.DataFrame, dict]:
     returns = prices.pct_change(fill_method=None).fillna(0)
+
+    if benchmark not in returns.columns:
+        raise ValueError(
+            f"Primary benchmark {benchmark} is missing from prices."
+        )
+
+    if secondary_benchmark not in returns.columns:
+        raise ValueError(
+            f"Secondary benchmark {secondary_benchmark} "
+            "is missing from prices."
+        )
 
     weight_matrix = weights.pivot(
         index="date",
@@ -96,25 +108,34 @@ def run_backtest(
         values="weight",
     )
 
-    weight_matrix = weight_matrix.reindex(
-        returns.index
-    ).ffill().fillna(0)
+    weight_matrix = (
+        weight_matrix.reindex(returns.index)
+        .ffill()
+        .fillna(0)
+    )
 
     weight_matrix = weight_matrix.reindex(
         columns=returns.columns,
         fill_value=0,
     )
 
-    # Today's signal becomes tomorrow's position.
+    # A signal created today becomes tomorrow's position.
     portfolio_returns = (
         weight_matrix.shift(1).fillna(0) * returns
     ).sum(axis=1)
 
     turnover = weight_matrix.diff().abs().sum(axis=1)
-    trading_costs = turnover * (transaction_cost_bps / 10_000)
+
+    trading_costs = (
+        turnover * (transaction_cost_bps / 10_000)
+    )
 
     net_returns = portfolio_returns - trading_costs
+
     benchmark_returns = returns[benchmark]
+    secondary_benchmark_returns = returns[
+        secondary_benchmark
+    ]
 
     results = pd.DataFrame(
         {
@@ -122,6 +143,7 @@ def run_backtest(
             "trading_cost": trading_costs,
             "net_return": net_returns,
             "benchmark_return": benchmark_returns,
+            "xeqt_return": secondary_benchmark_returns,
         }
     )
 
@@ -136,13 +158,58 @@ def run_backtest(
         1 + results["benchmark_return"]
     ).cumprod()
 
+    results["xeqt_value"] = (
+        1 + results["xeqt_return"]
+    ).cumprod()
+
+    # Main portfolio report remains relative to SPY.
     report = portfolio_risk_report(
         results["net_return"],
         results["benchmark_return"],
     )
 
+    # Separate comparison against XEQT.
+    xeqt_comparison = portfolio_risk_report(
+        results["net_return"],
+        results["xeqt_return"],
+    )
+
+    spy_report = portfolio_risk_report(
+        results["benchmark_return"]
+    )
+
+    xeqt_report = portfolio_risk_report(
+        results["xeqt_return"]
+    )
+
     report["total_turnover"] = turnover.loc[
         results.index
     ].sum()
+
+    report["spy_annual_return"] = spy_report[
+        "annual_return"
+    ]
+
+    report["xeqt_annual_return"] = xeqt_report[
+        "annual_return"
+    ]
+
+    report["excess_return_vs_spy"] = (
+        report["annual_return"]
+        - report["spy_annual_return"]
+    )
+
+    report["excess_return_vs_xeqt"] = (
+        report["annual_return"]
+        - report["xeqt_annual_return"]
+    )
+
+    report["beta_to_xeqt"] = xeqt_comparison[
+        "market_beta"
+    ]
+
+    report["correlation_to_xeqt"] = xeqt_comparison[
+        "correlation_to_benchmark"
+    ]
 
     return results, report
