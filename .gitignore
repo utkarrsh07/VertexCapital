@@ -42,3 +42,6 @@ typescript_errors.txt
 page_backup.txt
 README.txt
 README_UPGRADE14.txt
+
+data/vertex/
+v19_install/
