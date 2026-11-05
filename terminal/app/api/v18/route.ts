@@ -1,0 +1,18 @@
+import {NextRequest,NextResponse} from 'next/server';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+export const dynamic='force-dynamic';
+type R=Record<string,string>;
+function csv(t:string):R[]{const out:string[][]=[];let row:string[]=[],s='',q=false;for(let i=0;i<t.length;i++){let c=t[i];if(c==='"'){if(q&&t[i+1]==='"'){s+='"';i++}else q=!q;}else if(c===','&&!q){row.push(s);s='';}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&t[i+1]==='\n')i++;row.push(s);if(row.some(Boolean))out.push(row);row=[];s='';}else s+=c;}if(s||row.length){row.push(s);out.push(row)}const [h,...r]=out;return h?r.map(a=>Object.fromEntries(h.map((k,i)=>[k,a[i]||'']))):[]}
+async function readCsv(p:string){try{return csv(await readFile(p,'utf8'))}catch{return []}}
+const base=path.resolve(process.cwd(),'..','data');
+const finite=(x:unknown)=>{const n=Number(x);return Number.isFinite(n)?n:null};
+async function market(symbol:string){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),6500);try{const u=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=6mo&interval=1d`;const res=await fetch(u,{signal:controller.signal,headers:{'User-Agent':'Mozilla/5.0 VertexCapital Research'},cache:'no-store'});if(!res.ok)throw Error('market provider HTTP '+res.status);const v=(await res.json()).chart?.result?.[0];if(!v)throw Error('no market series');const q=v.indicators?.quote?.[0];const candles=(v.timestamp||[]).map((ts:number,i:number)=>({date:new Date(ts*1000).toISOString().slice(0,10),open:finite(q?.open?.[i]),high:finite(q?.high?.[i]),low:finite(q?.low?.[i]),close:finite(q?.close?.[i]),volume:finite(q?.volume?.[i])})).filter((x:{open:number|null;high:number|null;low:number|null;close:number|null})=>x.open!==null&&x.high!==null&&x.low!==null&&x.close!==null);return {candles,asOf:candles.at(-1)?.date||null,currency:v.meta?.currency||null,error:null}}catch(e){return {candles:[],asOf:null,currency:null,error:e instanceof Error?e.message:'Provider unavailable'}}finally{clearTimeout(timer)}}
+export async function GET(req:NextRequest){const ticker=(req.nextUrl.searchParams.get('ticker')||'AAPL').trim().toUpperCase();if(!/^[A-Z0-9.^-]{1,15}$/.test(ticker))return NextResponse.json({error:'Invalid ticker'},{status:400});
+const [v17,latest,backtest,fundamentals,price]=await Promise.all([readCsv(path.join(base,'recommendations','upgrade17','expanded_universe_rankings.csv')),readCsv(path.join(base,'recommendations','latest_rankings.csv')),readCsv(path.join(base,'backtest_results.csv')),readCsv(path.join(base,'equity_fundamentals.csv')),market(ticker)]);
+const source=v17.length?'V17 expanded scanner':latest.length?'Existing recommendations':'No scanner output';const rows=v17.length?v17:latest;
+const pick=(r:R)=>({ticker:r.ticker||r.symbol||r.Ticker||'',prediction:finite(r.predicted_20d_excess_return??r.predicted_20d_excess??r.ensemble_prediction??r.ensemble_pred??r.prediction),raw:r});
+const rankings=rows.map(pick).filter(r=>r.ticker).sort((a,b)=>(b.prediction??-999)-(a.prediction??-999)).slice(0,600);
+const equity=backtest.filter((_,i)=>i%Math.max(1,Math.ceil(backtest.length/260))===0||i===backtest.length-1).map(r=>({date:r.Date||r.date,portfolio:finite(r.portfolio_value),benchmark:finite(r.benchmark_value)})).filter(r=>r.portfolio!==null);
+const f=fundamentals.find(r=>(r.ticker||r.symbol||'').toUpperCase()===ticker)||null;
+return NextResponse.json({ticker,rankings,source,rankingsAsOf:rows[0]?.date||null,equity,price,fundamentals:f,universe:rankings.length,backtestAsOf:equity.at(-1)?.date||null},{headers:{'Cache-Control':'no-store'}})}
