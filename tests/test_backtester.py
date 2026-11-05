@@ -221,12 +221,9 @@ def test_transaction_cost_reduces_net_return():
         transaction_cost_bps=10,
     )
 
-    assert results.loc[dates[1], "trading_cost"] == pytest.approx(
-        0.001
-    )
-    assert results.loc[dates[1], "net_return"] == pytest.approx(
-        -0.001
-    )
+    assert results.loc[dates[1], "trading_cost"] == pytest.approx(0.0)
+    assert results.loc[dates[2], "trading_cost"] == pytest.approx(0.001)
+    assert results.loc[dates[2], "net_return"] == pytest.approx(-0.001)
 
 
 def test_zero_transaction_cost_makes_net_equal_gross():
@@ -335,3 +332,20 @@ def test_backtest_returns_expected_columns():
     }
 
     assert expected_columns.issubset(results.columns)
+
+def test_holdings_drift_without_rebalancing():
+    dates = pd.date_range("2026-01-01", periods=4, freq="D")
+    prices = pd.DataFrame({"AAPL": [100., 100., 110., 121.],
+                           "SPY": [100.] * 4, "XEQT.TO": [100.] * 4}, index=dates)
+    weights = pd.DataFrame({"date": [dates[1]], "ticker": ["AAPL"], "weight": [0.5]})
+    results, _ = run_backtest(prices, weights, transaction_cost_bps=0)
+    assert results.loc[dates[2], "gross_return"] == pytest.approx(0.05)
+    assert results.loc[dates[3], "gross_return"] == pytest.approx((0.55 / 1.05) * 0.1)
+
+def test_missing_held_return_is_not_zero_filled():
+    dates = pd.date_range("2026-01-01", periods=4, freq="D")
+    prices = pd.DataFrame({"AAPL": [100., 100., np.nan, 110.],
+                           "SPY": [100.] * 4, "XEQT.TO": [100.] * 4}, index=dates)
+    weights = pd.DataFrame({"date": [dates[1]], "ticker": ["AAPL"], "weight": [0.5]})
+    with pytest.raises(ValueError, match="Missing return for held asset"):
+        run_backtest(prices, weights)
