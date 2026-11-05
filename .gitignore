@@ -16,4 +16,29 @@ models/*.joblib
 
 # Testing and editor files
 .pytest_cache/
-.vscode/
+.vscode/.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+.env.*
+!.env.example
+*.zip
+*.lnk
+*.bak
+*.log
+.upgrade_backups/
+upgrade_backups/
+upgrade*_payload/
+payload/
+v17_fix/
+VertexCapital_Upgrade*/
+data/
+node_modules/
+.next/
+*.tsbuildinfo
+errors.txt
+typescript_errors.txt
+page_backup.txt
+README.txt
+README_UPGRADE14.txt
