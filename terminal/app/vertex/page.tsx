@@ -360,6 +360,56 @@ function LogLine({ line }: { line: string }) {
   );
 }
 
+/* ============================================================ market tab */
+type IndexData = { symbol: string; price: number; prevClose: number | null; change: number | null; points: [number, number][]; marketState: string };
+type MarketFeed = { asOf: number | null; ageMs: number | null; refreshing: boolean; source: string | null; coverage: number;
+  quotes: Record<string, [number, number | null]>; indices: Record<string, IndexData> };
+type Box = { x: number; y: number; w: number; h: number };
+const INDEX_CARDS: [string, string][] = [["^GSPC", "S&P 500"], ["^IXIC", "NASDAQ"], ["^DJI", "DOW"], ["^GSPTSE", "TSX COMPOSITE"]];
+
+/** Squarified treemap (Bruls et al.): lays values into rects with aspect ratios close to 1. */
+function squarify<T>(items: { v: number; d: T }[], r: Box): (Box & { d: T })[] {
+  const out: (Box & { d: T })[] = [];
+  const list = items.filter((i) => i.v > 0).sort((a, b) => b.v - a.v);
+  const total = list.reduce((a, i) => a + i.v, 0);
+  if (!total || r.w <= 0 || r.h <= 0) return out;
+  const scaled = list.map((i) => ({ a: (i.v / total) * r.w * r.h, d: i.d }));
+  const rect = { ...r };
+  const worst = (row: { a: number }[], side: number) => {
+    const s = row.reduce((x, i) => x + i.a, 0);
+    let m = 0;
+    for (const i of row) m = Math.max(m, (side * side * i.a) / (s * s), (s * s) / (side * side * i.a));
+    return m;
+  };
+  const lay = (row: { a: number; d: T }[]) => {
+    const s = row.reduce((x, i) => x + i.a, 0);
+    if (rect.w >= rect.h) {
+      const w = s / rect.h; let y = rect.y;
+      for (const i of row) { const h = i.a / w; out.push({ x: rect.x, y, w, h, d: i.d }); y += h; }
+      rect.x += w; rect.w -= w;
+    } else {
+      const h = s / rect.w; let x = rect.x;
+      for (const i of row) { const w = i.a / h; out.push({ x, y: rect.y, w, h, d: i.d }); x += w; }
+      rect.y += h; rect.h -= h;
+    }
+  };
+  let row: { a: number; d: T }[] = [];
+  for (const it of scaled) {
+    const side = Math.min(rect.w, rect.h);
+    if (!row.length || worst([...row, it], side) <= worst(row, side)) row.push(it);
+    else { lay(row); row = [it]; }
+  }
+  if (row.length) lay(row);
+  return out;
+}
+
+function heat(c: number | null | undefined) {
+  if (c == null || !isFinite(c)) return "#262c45";
+  const k = Math.max(-1, Math.min(1, c / 0.03));
+  const n = [64, 69, 84], to = k < 0 ? [246, 53, 56] : [48, 204, 90], t = Math.pow(Math.abs(k), 0.8);
+  return `rgb(${n.map((v, i) => Math.round(v + (to[i] - v) * t)).join(",")})`;
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
