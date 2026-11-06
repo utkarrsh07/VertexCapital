@@ -227,6 +227,8 @@ function CandleChart({ candles, stock, showLevels, showSma }: { candles: Candle[
         )}
         <g>
           <line x1={pad.l} x2={pad.l + cw} y1={y(last[4])} y2={y(last[4])} stroke="#e6ecff" strokeDasharray="2 3" opacity={0.35} />
+          <circle cx={pad.l + (candles.length - 1) * step + step / 2} cy={y(last[4])} r={3} className="vx-pulse-dot" />
+          <circle cx={pad.l + (candles.length - 1) * step + step / 2} cy={y(last[4])} r={3} className="vx-pulse-ring" />
           <rect x={pad.l + cw + 2} y={y(last[4]) - 8} width={58} height={16} rx={3} fill="#e6ecff" />
           <text x={pad.l + cw + 31} y={y(last[4]) + 4} textAnchor="middle" className="vx-tag dark">{fx(last[4])}</text>
         </g>
@@ -248,7 +250,7 @@ function Spark({ data, w = 140, h = 36, color = "#4f8cff", fill = true }: { data
     <svg width={w} height={h} className="vx-spark">
       <defs><linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".35" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
       {fill && <path d={`${d}L${w},${h}L0,${h}Z`} fill={`url(#${id})`} />}
-      <path d={d} fill="none" stroke={color} strokeWidth={1.5} />
+      <path d={d} fill="none" stroke={color} strokeWidth={1.5} className="vx-draw" pathLength={1} />
     </svg>
   );
 }
