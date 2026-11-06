@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import vertex_screener as vs  # noqa: E402
 
 
-def fake_prices(seed: int, n: int = 252, drift: float = 0.0004) -> pd.DataFrame:
+def fake_prices(seed: int, n: int = 1260, drift: float = 0.0004) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     close = 100 * np.exp(np.cumsum(rng.normal(drift, 0.015, n)))
     idx = pd.bdate_range(end="2026-11-04", periods=n)
@@ -47,6 +47,16 @@ def test_score_is_sector_relative_and_bounded():
     assert np.isnan(out.loc[1, "score"])
     s = out["score"].dropna()
     assert s.between(0, 100).all() and len(s) == n - 1
+
+
+def test_signals_are_decisive_tiers():
+    n = 100
+    df = pd.DataFrame({"symbol": [f"S{i}" for i in range(n)], "score": np.linspace(10, 90, n),
+                       "ml_pct": np.linspace(0, 1, n), "price": 10.0, "sma50": 9.0})
+    out = vs.composite_and_signals(df, {"state": "RISK-ON"})
+    counts = out["signal"].value_counts()
+    assert counts["STRONG BUY"] == 15 and counts["SELL"] == 15 and counts["HOLD"] == 30
+    assert out["composite"].between(0, 100).all()
 
 
 def test_portfolio_respects_caps():
