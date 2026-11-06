@@ -1,5 +1,5 @@
 """
-VertexCapital Screener (V19)
+VertexCapital Screener (V20)
 ============================
 Nine-factor, sector-relative equity screener with volatility-based trade levels
 and a risk-weighted model portfolio.
@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-VERSION = "19.0"
+VERSION = "20.0"
 BENCHMARK = "SPY"
 
 # key, label, weight, higher_is_better, group
@@ -47,6 +47,8 @@ FACTORS = [
     ("beta",           "Beta",              0.10, False, "quality"),
     ("momentum_6m",    "6M Momentum",       0.10, True,  "growth"),
 ]
+PRICE_PERIOD = "5y"     # 5 years: 1y for levels + 4y of walk-forward history for the ML model
+FUND_CACHE_VERSION = 2
 MIN_FACTORS = 6          # a stock needs at least 6 of 9 factors to be scored
 MIN_SECTOR_SIZE = 8      # smaller sectors are ranked against the whole universe
 CANDLE_DAYS = 160
@@ -87,7 +89,7 @@ def download_prices(symbols: list[str], chunk: int = 80) -> dict[str, pd.DataFra
     for bi, batch in enumerate(batches, 1):
         t = time.time()
         try:
-            raw = yf.download(batch, period="1y", interval="1d", auto_adjust=True,
+            raw = yf.download(batch, period=PRICE_PERIOD, interval="1d", auto_adjust=True,
                               group_by="ticker", threads=True, progress=False)
         except Exception as exc:  # network / Yahoo hiccup
             log("PRICES", f"batch {bi}/{len(batches)} failed: {exc}")
@@ -115,6 +117,15 @@ def _num(v):
         return None
 
 
+def _div_yield(info: dict):
+    y = _num(info.get("dividendYield"))
+    if y is None:
+        y = _num(info.get("trailingAnnualDividendYield"))
+    if y is not None and y > 0.25:      # some Yahoo versions report percent, not fraction
+        y = y / 100.0
+    return y
+
+
 def fetch_one_fundamental(symbol: str) -> dict:
     import yfinance as yf
     last_exc = None
@@ -138,6 +149,8 @@ def fetch_one_fundamental(symbol: str) -> dict:
                 "currency": info.get("currency"),
                 "exchange": info.get("exchange"),
                 "eps_trailing": _num(info.get("trailingEps")),
+                "dividend_yield": _div_yield(info),
+                "v": FUND_CACHE_VERSION,
                 "fetched": time.time(),
             }
         except Exception as exc:
@@ -154,7 +167,8 @@ def fetch_fundamentals(symbols: list[str], cache_path: Path, workers: int) -> di
         except Exception:
             cache = {}
     fresh = {s: cache[s] for s in symbols
-             if s in cache and "error" not in cache[s] and time.time() - cache[s].get("fetched", 0) < 86400}
+             if s in cache and "error" not in cache[s] and cache[s].get("v") == FUND_CACHE_VERSION
+             and time.time() - cache[s].get("fetched", 0) < 86400}
     todo = [s for s in symbols if s not in fresh]
     log("FUNDS", f"{len(fresh)} cached (<24h), fetching {len(todo)} with {workers} workers")
     done = 0
@@ -354,13 +368,15 @@ def run(root: Path, limit: int | None, workers: int) -> int:
         f = funds.get(s, {})
         lv = trade_levels(df)
         c = df["Close"]
-        a, hb = jensen_alpha(c, bench)
+        a, hb = jensen_alpha(c.tail(253), bench)
         rows.append({
             "symbol": s, "name": u["name"], "sector": u["sector"], "index": u["index"],
             **{k: f.get(k) for k, *_ in FACTORS if k != "momentum_6m"},
             "momentum_6m": float(c.iloc[-1] / c.iloc[-127] - 1) if len(c) > 127 else None,
             "alpha": a, "beta_realized": hb,
             "change_1d": float(c.iloc[-1] / c.iloc[-2] - 1),
+            "vol_1y": float(c.pct_change().tail(252).std() * np.sqrt(252)),
+            "dividend_yield": f.get("dividend_yield"),
             "market_cap": f.get("market_cap"), "currency": f.get("currency") or ("CAD" if s.endswith(".TO") else "USD"),
             **lv,
         })
