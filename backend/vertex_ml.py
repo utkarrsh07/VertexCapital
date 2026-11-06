@@ -267,3 +267,17 @@ def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series) -> dict:
         "last_oos": str(pd.Timestamp(ens_ic.index.max()).date()) if n else None,
         "oos_months": n,
     }
+
+
+def regime(spy: pd.Series) -> dict:
+    px = float(spy.iloc[-1])
+    ma200 = float(spy.rolling(200).mean().iloc[-1])
+    vol20 = float(spy.pct_change().tail(20).std() * math.sqrt(252))
+    dd = float(px / spy.tail(252).max() - 1)
+    if px > ma200 and vol20 < 0.22 and dd > -0.10:
+        state, exposure = "RISK-ON", 1.0
+    elif px < ma200 and (vol20 > 0.25 or dd < -0.15):
+        state, exposure = "RISK-OFF", 0.6
+    else:
+        state, exposure = "NEUTRAL", 0.85
+    return {"state": state, "exposure": exposure, "spy_vs_200d": px / ma200 - 1, "vol_20d": vol20, "drawdown_52w": dd}
