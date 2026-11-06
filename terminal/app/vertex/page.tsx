@@ -294,6 +294,55 @@ function Ring({ segs, size, stroke, gap = 0.04, children, icons }: {
   );
 }
 
+/* ============================================================ trade setup bar */
+function SetupBar({ stock, price, live, date, intraday }: {
+  stock: Stock; price: number; live: boolean; date?: string; intraday: [number, number][] | null;
+}) {
+  const zLo = Math.max(stock.stop + 0.15 * stock.atr, stock.entry - 0.25 * stock.atr);
+  const zHi = stock.entry + 0.25 * stock.atr;
+  const lo = stock.stop, hi = stock.target, span = hi - lo || 1;
+  const at = (v: number) => Math.max(0, Math.min(100, ((v - lo) / span) * 100));
+  const status =
+    price <= stock.stop ? { t: "Below stop — setup invalidated", c: "dn" }
+    : price >= stock.target ? { t: "Target reached", c: "up" }
+    : price < zLo ? { t: "Below entry zone — near risk level", c: "warn" }
+    : price <= zHi ? { t: "Inside entry zone", c: "acc" }
+    : { t: "Above entry zone — wait for pullback", c: "mut" };
+  const dist = (v: number) => pct(v / price - 1, 1);
+  const pts = intraday && intraday.length > 1 ? intraday.map((p) => p[1]) : null;
+  return (
+    <section className="vx-card vx-setup">
+      <div className="vx-setup-h">
+        <b>{tick(stock.symbol)} — Trade Setup</b>
+        <span className={cls("vx-badge2", live && "live")}>{live ? <><span className="vx-dot ok" />Live</> : `Scan ${date || ""}`}</span>
+      </div>
+      <div className="vx-setup-k">
+        <div><span>Entry zone</span><b className="up">{fx(zLo)}–{fx(zHi)}</b></div>
+        <div><span>Target</span><b>${fx(stock.target)}</b><i className="up">{dist(stock.target)}</i></div>
+        <div><span>Risk level</span><b className="dn">${fx(stock.stop)}</b><i className="dn">{dist(stock.stop)}</i></div>
+      </div>
+      <div className="vx-setup-bar">
+        <span className="seg r" style={{ left: 0, width: `${at(zLo)}%` }} />
+        <span className="seg a" style={{ left: `${at(zLo)}%`, width: `${at(zHi) - at(zLo)}%` }} />
+        <span className="seg g" style={{ left: `${at(zHi)}%`, width: `${100 - at(zHi)}%` }} />
+        <span className={cls("vx-mark", status.c)} style={{ left: `${at(price)}%` }}>
+          <em><Tween v={price} fmt={(x) => fx(x)} /></em>
+        </span>
+      </div>
+      <div className="vx-setup-t">
+        <span>${fx(stock.stop)}</span>
+        <span style={{ left: `${at(stock.entry)}%` }}>${fx(stock.entry)}</span>
+        <span>${fx(stock.target)}</span>
+      </div>
+      <div className="vx-setup-f">
+        <span className={cls("vx-st", status.c)}>{status.t}</span>
+        {pts && <Spark data={pts} w={110} h={22} fill={false} color={pts[pts.length - 1] >= pts[0] ? "#21d49a" : "#ff4d6d"} />}
+      </div>
+      <div className="vx-setup-n">ATR(14) volatility levels from the {date} scan · price {live ? "live, ~15 min delayed" : "from scan"} · not a forecast</div>
+    </section>
+  );
+}
+
 /* ============================================================ console */
 const TAG_CLASS: Record<string, string> = {
   INIT: "t-init", UNIVERSE: "t-uni", PRICES: "t-px", FUNDS: "t-fund", FACTORS: "t-fac", RANK: "t-rank",
@@ -723,12 +772,11 @@ export default function VertexPage() {
           </section>
 
           {/* ---- planner */}
-          <section className="vx-card vx-d">
+          <div className="vx-d">
+          {stock && <SetupBar stock={stock} price={px(stock)} live={!!q(stock.symbol)} date={report?.price_date}
+            intraday={feed?.intraday?.symbol === stock.symbol ? feed.intraday.points : null} />}
+          <section className="vx-card vx-plan-card">
             <h3>Position Planner</h3>
-            <label className="vx-lbl">Selected stock</label>
-            <div className="vx-select">
-              {stock ? (<><Badge s={stock} size={18} /><b>{tick(stock.symbol)}</b><span className="vx-muted">{stock.name}</span></>) : <span className="vx-muted">—</span>}
-            </div>
             <div className="vx-opts">
               <div className="on"><span className="vx-dot ok" />Long only</div>
               <div><span className={cls("vx-sig", stock?.signal || "N/A")}>{stock?.signal || "—"}</span>Signal</div>
@@ -757,6 +805,7 @@ export default function VertexPage() {
               <button onClick={exportCsv} disabled={!table.length}>EXPORT CSV</button>
             </div>
           </section>
+          </div>
 
           <footer className="vx-ticker">
             <span className="vx-ticker-k">ENGINE</span>
