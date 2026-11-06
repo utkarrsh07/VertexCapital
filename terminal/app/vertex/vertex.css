@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=JetBrains+Mono:wght@400;600&display=swap");
 /* VertexCapital V19 — scoped under .vx-root so it never clashes with existing pages */
 .vx-root {
   --bg: #050a1c;
@@ -484,3 +485,54 @@
   .vx-idx, .vx-brs { grid-template-columns: 1fr 1fr; }
   .vx-mrow { grid-template-columns: 1fr; }
 }
+/* theme switch button (both themes) */
+.vx-theme { font-size: 11px !important; color: var(--mut) !important; padding: 4px 8px !important; border-radius: 4px; border: 1px solid var(--line2) !important; }
+.vx-theme:hover { color: var(--txt) !important; }
+
+/* =====================================================================
+   CARBON THEME  (default; "Classic theme" button restores the original)
+   Flat near-black, amber accent, Archivo in two widths. No glows/gradients.
+   ===================================================================== */
+.vx-root.th-carbon {
+  --bg: #040506; --card: #0b0d0f; --card2: #0b0d0f; --line: #1c2024; --line2: #2a2f34;
+  --txt: #ece8e1; --mut: #80868c; --acc: #e8a33d; --acc2: #c98a26; --cyan: #7fb2c4;
+  --up: #45c08a; --dn: #e5534b; --mono: "Archivo", "Segoe UI", sans-serif;
+  --raise: #121518; --sel: rgba(232, 163, 61, 0.09);
+  font-family: "Archivo", "Segoe UI", system-ui, sans-serif; font-stretch: 94%;
+  font-variant-numeric: tabular-nums; font-size: 12.75px; letter-spacing: 0.005em;
+}
+.th-carbon .vx-bg { display: none; }
+.th-carbon .vx-card { background: var(--card); border: 1px solid var(--line); border-radius: 3px; box-shadow: none; }
+.th-carbon .vx-card h3 { font-size: 13px; font-weight: 650; font-stretch: 112%; letter-spacing: 0; }
+.th-carbon .vx-h1, .th-carbon .vx-title h1 { font-size: 23px; font-weight: 800; font-stretch: 125%; letter-spacing: -0.015em; }
+.th-carbon .vx-title-ic { display: none; }
+
+/* nav */
+.th-carbon .vx-nav { background: var(--bg); backdrop-filter: none; border-bottom: 1px solid var(--line); }
+.th-carbon .vx-brand { font-size: 18px; font-weight: 850; font-stretch: 125%; letter-spacing: -0.02em; }
+.th-carbon .vx-brand b { color: var(--acc); font-weight: 850; }
+.th-carbon .vx-brand svg path:first-of-type { stroke: var(--acc); }
+.th-carbon .vx-brand svg path:last-of-type { stroke: var(--txt); }
+.th-carbon .vx-ixch .vx-pulse-ring { display: none; }
+.th-carbon .vx-tabs { gap: 2px; }
+.th-carbon .vx-tabs button { color: var(--mut); border-radius: 0; padding: 18px 14px 16px; border-bottom: 2px solid transparent; font-weight: 550; }
+.th-carbon .vx-tabs button:hover { background: none; color: var(--txt); }
+.th-carbon .vx-tabs button.on { background: none; box-shadow: none; color: var(--txt); border-bottom-color: var(--acc); }
+.th-carbon .vx-tabs svg { display: none; }
+.th-carbon .vx-avatar { background: var(--raise); color: var(--acc); border: 1px solid var(--line2); }
+.th-carbon .vx-pill { color: var(--mut); border-color: var(--line2); letter-spacing: 0; text-transform: lowercase; }
+.th-carbon .vx-pill::first-letter { text-transform: uppercase; }
+.th-carbon .vx-pill { display: inline-block; }
+.th-carbon .vx-clock, .th-carbon .vx-ic { color: var(--mut); }
+.th-carbon .vx-live { border-radius: 3px; }
+.th-carbon .vx-live.on { color: var(--up) !important; background: none !important; border-color: var(--line2) !important; }
+.th-carbon .vx-ring-t { background: conic-gradient(var(--acc) var(--k), var(--line2) 0); }
+.th-carbon .vx-dot.ok { box-shadow: none; }
+.th-carbon .vx-banner { border-radius: 3px; }
+
+/* sentence case for labels written in caps in the markup */
+.th-carbon .vx-sub button, .th-carbon .vx-chips button, .th-carbon .vx-actions button, .th-carbon .vx-more,
+.th-carbon .vx-cols span, .th-carbon .vx-ticker-k { text-transform: lowercase; letter-spacing: 0; display: inline-block; }
+.th-carbon .vx-sub button::first-letter, .th-carbon .vx-chips button::first-letter, .th-carbon .vx-actions button::first-letter,
+.th-carbon .vx-more::first-letter, .th-carbon .vx-cols span::first-letter, .th-carbon .vx-ticker-k::first-letter { text-transform: uppercase; }
+
