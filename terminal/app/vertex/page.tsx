@@ -115,6 +115,7 @@ const I = {
     </svg>
   ),
   dash: <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5 14h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>,
+  grid: <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="7" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="10" y="1.5" width="4.5" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="10" y="7" width="4.5" height="7.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /><rect x="1.5" y="11" width="7" height="3.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>,
   term: <svg viewBox="0 0 16 16" width="14" height="14"><path d="M2 12 6 8 2 4M8 12h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   book: <svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 2.5h7a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z M3 11.5a2 2 0 0 1 2-2h7" fill="none" stroke="currentColor" strokeWidth="1.4" /></svg>,
   refresh: <svg viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
@@ -608,7 +609,7 @@ export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [savedLog, setSavedLog] = useState<string[]>([]);
-  const [view, setView] = useState<"terminal" | "dashboard">("terminal");
+  const [view, setView] = useState<"terminal" | "dashboard" | "market">("terminal");
   const [universe, setUniverse] = useState("All");
   const [sel, setSel] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -825,6 +826,7 @@ export default function VertexPage() {
         <div className="vx-brand">{I.logo}<span>Vertex<b>Capital</b></span></div>
         <nav className="vx-tabs">
           <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Dashboard</button>
+          <button className={cls(view === "market" && "on")} onClick={() => setView("market")}>{I.grid}Market</button>
           <button className={cls(view === "terminal" && "on")} onClick={() => setView("terminal")}>{I.term}Strategy Terminal</button>
           <button onClick={() => setShowMethod(true)}>{I.book}Methodology</button>
           <button onClick={runScan} disabled={scanning}>{I.refresh}{scanning ? "Scanning…" : "Run Scan"}</button>
@@ -848,7 +850,9 @@ export default function VertexPage() {
         </div>
       )}
 
-      {view === "terminal" ? (
+      {view === "market" ? (
+        <MarketView report={report} clock={clock} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
+      ) : view === "terminal" ? (
         <main className="vx-term">
           <div className="vx-title">
             <h1><span className="vx-title-ic">{I.term}</span>Strategy Terminal</h1>
