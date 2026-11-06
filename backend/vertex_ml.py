@@ -69,3 +69,40 @@ def _rsi(close: pd.DataFrame, n: int = 14) -> pd.DataFrame:
     up = d.clip(lower=0).ewm(alpha=1 / n, adjust=False).mean()
     dn = (-d.clip(upper=0)).ewm(alpha=1 / n, adjust=False).mean()
     return 100 - 100 / (1 + up / dn.replace(0, np.nan))
+
+
+def compute_features(close: pd.DataFrame, volume: pd.DataFrame, sectors: dict[str, str], bench: str = "SPY"):
+    r = close.pct_change(fill_method=None)
+    m = r[bench]
+    f: dict[str, pd.DataFrame] = {}
+    f["mom_12_1"] = close.shift(21) / close.shift(252) - 1
+    f["mom_6_1"] = close.shift(21) / close.shift(126) - 1
+    f["mom_3"] = close / close.shift(63) - 1
+    f["rev_1m"] = -(close / close.shift(21) - 1)                 # sign flipped: losers score high
+    f["vol_63"] = -r.rolling(63, min_periods=50).std() * math.sqrt(252)   # low vol scores high
+    f["dvol_63"] = -r.clip(upper=0).rolling(63, min_periods=50).std() * math.sqrt(252)
+    cov = r.rolling(252, min_periods=180).cov(m)
+    beta = cov.div(m.rolling(252, min_periods=180).var(), axis=0)
+    f["beta_252"] = -beta                                         # betting-against-beta
+    resid = r - beta.mul(m, axis=0)
+    f["ivol_63"] = -resid.rolling(63, min_periods=50).std() * math.sqrt(252)
+    f["hi52"] = close / close.rolling(252, min_periods=200).max() - 1
+    f["ma50"] = close / close.rolling(50).mean() - 1
+    f["ma200"] = close / close.rolling(200, min_periods=180).mean() - 1
+    f["max21"] = -r.rolling(21).max()
+    dollar = (close * volume).replace(0, np.nan)
+    f["illiq"] = -(r.abs() / dollar).rolling(63, min_periods=40).mean() * 1e9
+    f["volshock"] = volume.rolling(20).mean() / volume.rolling(120, min_periods=80).mean() - 1
+    f["rsi14"] = _rsi(close)
+    # sector-relative 12-1 momentum: stock minus its sector median each day
+    sec = pd.Series(sectors)
+    mom = f["mom_12_1"]
+    smed = pd.DataFrame(index=mom.index, columns=mom.columns, dtype=float)
+    for s_name, members in sec.groupby(sec).groups.items():
+        cols = [c for c in members if c in mom.columns]
+        if cols:
+            med = mom[cols].median(axis=1)
+            for c in cols:
+                smed[c] = med
+    f["smom"] = mom - smed
+    return f, beta
