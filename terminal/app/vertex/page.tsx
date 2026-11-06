@@ -452,6 +452,17 @@ function IndexCard({ name, d }: { name: string; d?: IndexData }) {
   );
 }
 
+function Breadth({ label, l, r, a, b }: { label: string; l: string; r: string; a: number; b: number }) {
+  const t = a + b || 1;
+  return (
+    <section className="vx-card vx-br">
+      <div className="vx-br-h"><span className="up">{l}</span><b>{label}</b><span className="dn">{r}</span></div>
+      <div className="vx-br-v"><span className="up">{pct(a / t, 1, false)} ({a})</span><span className="dn">({b}) {pct(b / t, 1, false)}</span></div>
+      <div className="vx-br-bar"><span className="g" style={{ width: `${(a / t) * 100}%` }} /><span className="r" style={{ width: `${(b / t) * 100}%` }} /></div>
+    </section>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
