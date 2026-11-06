@@ -337,6 +337,9 @@ export default function VertexPage() {
   const [showMethod, setShowMethod] = useState(false);
   const [clock, setClock] = useState("");
   const consoleRef = useRef<HTMLDivElement>(null);
+  const [feed, setFeed] = useState<QuoteFeed | null>(null);
+  const [nextIn, setNextIn] = useState(REFRESH_S);
+  const [liveOn, setLiveOn] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -404,7 +407,23 @@ export default function VertexPage() {
   const stocks = useMemo(() => (report?.stocks || []).filter((s) => universe === "All" || s.index === universe), [report, universe]);
   const scored = useMemo(() => stocks.filter((s) => s.score != null), [stocks]);
   const stock = useMemo(() => report?.stocks.find((s) => s.symbol === sel) || null, [report, sel]);
-  const shown = candles.slice(-range);
+  const q = useCallback((sym: string) => (liveOn ? feed?.quotes[sym] : undefined), [feed, liveOn]);
+  const px = useCallback((s: { symbol: string; price: number }) => q(s.symbol)?.price ?? s.price, [q]);
+  const chg = useCallback((s: { symbol: string; change_1d?: number | null }) => q(s.symbol)?.change ?? s.change_1d ?? null, [q]);
+
+  // today's candle from the live quote (appended or updated in place)
+  const liveCandles = useMemo(() => {
+    const lq = sel ? q(sel) : undefined;
+    if (!lq || !candles.length) return candles;
+    const d = new Date(lq.time * 1000);
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const last = candles[candles.length - 1];
+    const bar: Candle = [day, lq.open ?? last[4], Math.max(lq.high ?? lq.price, lq.price), Math.min(lq.low ?? lq.price, lq.price), lq.price, lq.volume ?? 0];
+    if (day > last[0]) return [...candles, bar];
+    if (day === last[0]) return [...candles.slice(0, -1), bar];
+    return candles;
+  }, [candles, sel, q]);
+  const shown = liveCandles.slice(-range);
 
   const ranked = useMemo(() => {
     const q = query.trim().toUpperCase();
@@ -455,6 +474,53 @@ export default function VertexPage() {
     return [...m.values()].sort((a, b) => b.weight - a.weight);
   }, [port]);
 
+  /* ----- live quote polling (visible rows + holdings + top ranked + index tape) */
+  const topRanked = useMemo(() => [...scored].sort((a, b) => topMode === "score"
+    ? (b.score! - a.score!) : ((b.factors.momentum_6m?.value ?? -9) - (a.factors.momentum_6m?.value ?? -9))).slice(0, 8), [scored, topMode]);
+  const watch = useMemo(() => {
+    const set = new Set<string>();
+    if (sel) set.add(sel);
+    TAPE.forEach((t) => set.add(t));
+    (port?.holdings || []).forEach((h) => set.add(h.symbol));
+    topRanked.forEach((s) => set.add(s.symbol));
+    (bottomTab === "levels" ? table : []).slice(0, 25).forEach((s) => set.add(s.symbol));
+    ranked.slice(0, 12).forEach((s) => set.add(s.symbol));
+    return [...set].slice(0, 60);
+  }, [sel, port, topRanked, table, ranked, bottomTab]);
+  const watchRef = useRef(watch); watchRef.current = watch;
+  const selRef = useRef(sel); selRef.current = sel;
+
+  const poll = useCallback(async () => {
+    if (!watchRef.current.length) return;
+    try {
+      const url = `/api/vertex/quotes?symbols=${encodeURIComponent(watchRef.current.join(","))}${selRef.current ? `&intraday=${encodeURIComponent(selRef.current)}` : ""}`;
+      const r: QuoteFeed = await fetch(url, { cache: "no-store" }).then((x) => x.json());
+      setFeed((prev) => ({ ...r, quotes: { ...(prev?.quotes || {}), ...r.quotes },
+        intraday: r.intraday || (prev?.intraday?.symbol === selRef.current ? prev.intraday : null) }));
+    } catch (e) {
+      setFeed((prev) => prev ? { ...prev, error: (e as Error).message } : prev);
+    }
+    setNextIn(REFRESH_S);
+  }, []);
+  useEffect(() => {
+    if (!liveOn || !report) return;
+    poll();
+    const id = setInterval(() => setNextIn((n) => { if (n <= 1) { poll(); return REFRESH_S; } return n - 1; }), 1000);
+    return () => clearInterval(id);
+  }, [liveOn, report, poll]);
+  useEffect(() => { if (liveOn && report) poll(); }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const marketState = feed?.quotes.SPY?.marketState || "";
+  const isOpen = /REGULAR/.test(marketState);
+  const liveValue = useMemo(() => {
+    if (!port) return null;
+    const inv = port.holdings.reduce((a, h) => a + h.shares * px(h), 0);
+    const cost = port.holdings.reduce((a, h) => a + h.shares * h.price, 0);
+    const cash = port.capital - cost;
+    const today = port.holdings.reduce((a, h) => { const c = q(h.symbol)?.change; return a + (c != null ? h.shares * px(h) * c / (1 + c) : 0); }, 0);
+    return { total: inv + cash, pnl: inv - cost, today, todayPct: today / (inv + cash - today) };
+  }, [port, px, q]);
+
   const lastLine = (scanning ? live : savedLog).filter((l) => /^\[/.test(l)).slice(-1)[0] || "";
 
   /* ============================================================ render */
@@ -470,8 +536,11 @@ export default function VertexPage() {
           <button onClick={runScan} disabled={scanning}>{I.refresh}{scanning ? "Scanning…" : "Run Scan"}</button>
         </nav>
         <div className="vx-user">
-          <span className={cls("vx-dot", scanning ? "busy" : report ? "ok" : "off")} />
-          <span className="vx-muted">{scanning ? "Engine running" : report ? `Data ${report.price_date}` : "No data"}</span>
+          <button className={cls("vx-live", liveOn && feed?.received ? "on" : "")} onClick={() => setLiveOn(!liveOn)} title="Toggle live quotes">
+            <span className={cls("vx-dot", scanning ? "busy" : liveOn && feed?.received ? "ok" : "off")} />
+            {scanning ? "Engine running" : !liveOn ? "Live off" : feed?.received ? (isOpen ? "LIVE" : "Market closed") : "Connecting…"}
+            {liveOn && <span className="vx-ring-t" style={{ ["--k" as string]: `${(nextIn / REFRESH_S) * 100}%` }} />}
+          </button>
           <span className="vx-clock">{clock}</span>
           <span className="vx-ic">{I.bell}</span>
           <span className="vx-avatar">VC</span>
