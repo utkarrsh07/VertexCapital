@@ -106,3 +106,38 @@ def compute_features(close: pd.DataFrame, volume: pd.DataFrame, sectors: dict[st
                 smed[c] = med
     f["smom"] = mom - smed
     return f, beta
+
+
+def _xs_rank(df: pd.DataFrame) -> pd.DataFrame:
+    """Cross-sectional rank to [-0.5, 0.5] per date (robust to outliers and scale)."""
+    return df.rank(axis=1, pct=True) - 0.5
+
+
+def build_dataset(close, volume, sectors, bench="SPY"):
+    feats, beta = compute_features(close, volume, sectors, bench)
+    stocks = [c for c in close.columns if c != bench]
+    fwd = close[stocks].shift(-HORIZON) / close[stocks] - 1
+    n = len(close)
+    # sample dates every HORIZON sessions, anchored on the LAST date so the newest month is predictable
+    pos = list(range(n - 1, 251, -HORIZON))[::-1]
+    dates = close.index[pos]
+    rows = []
+    for d in dates:
+        X = pd.DataFrame({k: feats[k].loc[d, stocks] for k, _ in FEATURES})
+        ok = X.notna().sum(axis=1) >= len(FEATURES) - 3
+        X = X[ok]
+        if len(X) < MIN_NAMES:
+            continue
+        Xr = X.rank(pct=True) - 0.5
+        Xr = Xr.fillna(0.0)                          # missing -> neutral
+        y = fwd.loc[d, X.index]
+        ex = y - y.median()
+        out = Xr.copy()
+        out["date"] = d
+        out["symbol"] = X.index
+        out["fwd"] = y.values
+        out["fwd_ex"] = ex.values
+        out["target"] = ex.rank(pct=True).values - 0.5
+        rows.append(out)
+    data = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+    return data, feats, beta
