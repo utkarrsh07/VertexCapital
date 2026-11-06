@@ -625,6 +625,50 @@ function MarketView({ report, onOpen, clock }: { report: Report | null; onOpen: 
   );
 }
 
+/* ============================================================ shared line chart */
+function LineChart({ series, height = 220, fmt, zero }: {
+  series: { name: string; color: string; pts: [string, number][]; dash?: boolean; bars?: boolean }[];
+  height?: number; fmt: (v: number) => string; zero?: number;
+}) {
+  const [ref, { w }] = useSize<HTMLDivElement>();
+  const [hi, setHi] = useState<number | null>(null);
+  const all = series.flatMap((s) => s.pts.map((p) => p[1])).filter((v) => isFinite(v)).concat(zero != null ? [zero] : []);
+  const n = Math.max(...series.map((s) => s.pts.length), 0);
+  if (!n || w < 50) return <div ref={ref} style={{ height }} className="vx-empty sm">No data</div>;
+  const lo = Math.min(...all), hiV = Math.max(...all), pad = (hiV - lo) * 0.08 || 1;
+  const L = 8, R = 56, T = 8, B = 20, cw = w - L - R, ch = height - T - B;
+  const X = (i: number) => L + (n === 1 ? cw / 2 : (i / (n - 1)) * cw);
+  const Y = (v: number) => T + ((hiV + pad - v) / (hiV - lo + 2 * pad)) * ch;
+  const ticks = Array.from({ length: 5 }, (_, i) => lo - pad + ((hiV - lo + 2 * pad) * i) / 4);
+  const dates = series[0].pts.map((p) => p[0]);
+  return (
+    <div ref={ref} className="vx-lc" style={{ minHeight: height }}
+      onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left - L) / cw) * (n - 1)); setHi(i >= 0 && i < n ? i : null); }}
+      onMouseLeave={() => setHi(null)}>
+      <svg width={w} height={height}>
+        {ticks.map((t, i) => <g key={i}><line x1={L} x2={L + cw} y1={Y(t)} y2={Y(t)} className="vx-grid" /><text x={L + cw + 6} y={Y(t) + 3} className="vx-axis">{fmt(t)}</text></g>)}
+        {zero != null && <line x1={L} x2={L + cw} y1={Y(zero)} y2={Y(zero)} stroke="var(--mut)" strokeDasharray="3 3" opacity={0.6} />}
+        {dates.filter((_, i) => i % Math.max(1, Math.ceil(n / 6)) === 0).map((d) => {
+          const i = dates.indexOf(d);
+          return <text key={d} x={X(i)} y={height - 5} textAnchor={i === 0 ? "start" : "middle"} className="vx-axis">{d.slice(0, 7)}</text>;
+        })}
+        {series.map((s) => s.bars
+          ? s.pts.map((p, i) => <rect key={i} x={X(i) - Math.max(1, cw / n * 0.35)} width={Math.max(2, cw / n * 0.7)} y={Math.min(Y(p[1]), Y(zero ?? 0))}
+              height={Math.abs(Y(p[1]) - Y(zero ?? 0))} fill={p[1] >= (zero ?? 0) ? "var(--up)" : "var(--dn)"} opacity={0.45} />)
+          : <path key={s.name} d={s.pts.map((p, i) => !isFinite(p[1]) ? "" : `${i && isFinite(s.pts[i - 1][1]) ? "L" : "M"}${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("")} fill="none"
+              stroke={s.color} strokeWidth={s.dash ? 1.2 : 1.8} strokeDasharray={s.dash ? "4 3" : undefined} className="vx-draw" pathLength={1} />)}
+        {hi != null && <line x1={X(hi)} x2={X(hi)} y1={T} y2={T + ch} className="vx-cross" />}
+      </svg>
+      <div className="vx-lc-leg">
+        {hi != null && <span className="vx-muted">{dates[hi]}</span>}
+        {series.map((s) => (
+          <span key={s.name}><i style={{ background: s.color }} />{s.name}{hi != null && s.pts[hi] && isFinite(s.pts[hi][1]) ? <b> {fmt(s.pts[hi][1])}</b> : null}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
