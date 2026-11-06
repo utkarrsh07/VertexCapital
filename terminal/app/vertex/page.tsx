@@ -370,7 +370,7 @@ function SetupBar({ stock, price, live, date, intraday }: {
 /* ============================================================ console */
 const TAG_CLASS: Record<string, string> = {
   INIT: "t-init", UNIVERSE: "t-uni", PRICES: "t-px", FUNDS: "t-fund", FACTORS: "t-fac", RANK: "t-rank",
-  SCORE: "t-score", LEVELS: "t-lvl", SIGNAL: "t-sig", PORTF: "t-port", DONE: "t-done", ERROR: "t-err",
+  SCORE: "t-score", LEVELS: "t-lvl", SIGNAL: "t-sig", PORTF: "t-port", DONE: "t-done", ERROR: "t-err", ML: "t-ml", WARN: "t-err",
 };
 function LogLine({ line }: { line: string }) {
   const m = line.match(/^\[\s*([\d.]+s)\]\s+(\w+)\s+(.*)$/);
@@ -1038,7 +1038,7 @@ export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [savedLog, setSavedLog] = useState<string[]>([]);
-  const [view, setView] = useState<"terminal" | "dashboard" | "market">("terminal");
+  const [view, setView] = useState<"terminal" | "dashboard" | "market" | "model">("terminal");
   const [universe, setUniverse] = useState("All");
   const [sel, setSel] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -1262,9 +1262,10 @@ export default function VertexPage() {
       <header className="vx-nav">
         <div className="vx-brand">{I.logo}<span>Vertex<b>Capital</b></span></div>
         <nav className="vx-tabs">
-          <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Dashboard</button>
+          <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Portfolio</button>
           <button className={cls(view === "market" && "on")} onClick={() => setView("market")}>{I.grid}Market</button>
           <button className={cls(view === "terminal" && "on")} onClick={() => setView("terminal")}>{I.term}Strategy Terminal</button>
+          <button className={cls(view === "model" && "on")} onClick={() => setView("model")}>{I.book}Model</button>
           <button onClick={() => setShowMethod(true)}>{I.book}Methodology</button>
           <button onClick={runScan} disabled={scanning}>{I.refresh}{scanning ? "Scanning…" : "Run Scan"}</button>
         </nav>
@@ -1289,7 +1290,9 @@ export default function VertexPage() {
         </div>
       )}
 
-      {view === "market" ? (
+      {view === "model" ? (
+        <ModelView report={report} />
+      ) : view === "market" ? (
         <MarketView report={report} clock={clock} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
       ) : view === "terminal" ? (
         <main className="vx-term">
@@ -1546,163 +1549,7 @@ export default function VertexPage() {
           </footer>
         </main>
       ) : (
-        /* ============================================================ dashboard */
-        <main className="vx-dash">
-          <h1 className="vx-h1">Portfolio Dashboard</h1>
-          <div className="vx-row1">
-            <section className="vx-card">
-              <h3>Overview</h3>
-              <div className="vx-ov">
-                <Ring size={150} stroke={11} gap={0.06}
-                  segs={(() => {
-                    const top = sectors.slice(0, 3).map((s, i) => ({ v: s.weight, c: ["#f59e0b", "#22c3ee", "#4f8cff"][i] }));
-                    const rest = sectors.slice(3).reduce((a, s) => a + s.weight, 0) + (port?.cash_weight || 0);
-                    return [...top, { v: rest, c: "#5b6fb3" }];
-                  })()}>
-                  <div className="vx-ov-v"><Tween v={liveValue?.total ?? port?.capital ?? 0} fmt={(x) => money(x)} /></div>
-                  <div className={cls("sm", (liveValue?.today || 0) >= 0 ? "up" : "dn")}>
-                    {liveValue && feed?.received ? `${liveValue.today >= 0 ? "+" : "-"}${money(Math.abs(liveValue.today))} today` : "Model portfolio"}
-                  </div>
-                </Ring>
-                <div className="vx-legend">
-                  {sectors.slice(0, 3).map((s, i) => (
-                    <div key={s.sector}>
-                      <span className="vx-ldot" style={{ background: ["#f59e0b", "#22c3ee", "#4f8cff"][i] }} />
-                      <div><div className="vx-lname">{short(s.sector)}</div><div className="vx-lval">{pct(s.weight, 2, false)}</div></div>
-                      <span className="vx-lmoney">{money(s.value, 2)}</span>
-                    </div>
-                  ))}
-                  <div>
-                    <span className="vx-ldot" style={{ background: "#5b6fb3" }} />
-                    <div><div className="vx-lname">Other + cash</div><div className="vx-lval">{pct(sectors.slice(3).reduce((a, s) => a + s.weight, 0) + (port?.cash_weight || 0), 2, false)}</div></div>
-                    <span className="vx-lmoney">{money((sectors.slice(3).reduce((a, s) => a + s.weight, 0) + (port?.cash_weight || 0)) * (port?.capital || 0), 2)}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="vx-card">
-              <div className="vx-chead">
-                <h3>Trailing Performance</h3>
-                <div className="vx-mini">
-                  <button className={cls(perfMode === "portfolio" && "on")} onClick={() => setPerfMode("portfolio")}>Basket</button>
-                  <button className={cls(perfMode === "benchmark" && "on")} onClick={() => setPerfMode("benchmark")}>SPY</button>
-                </div>
-              </div>
-              <div className="vx-bars" style={{ gridTemplateColumns: `repeat(${(port?.trailing.length || 4) + (feed?.received ? 1 : 0)}, 1fr)` }}>
-                {(() => {
-                  const spy = q("SPY")?.change ?? null;
-                  const tr = [...(port?.trailing || []),
-                    ...(liveValue && feed?.received ? [{ period: "Today", portfolio: liveValue.todayPct, benchmark: spy }] : [])];
-                  const vals = tr.map((t) => (perfMode === "portfolio" ? t.portfolio : t.benchmark) ?? 0);
-                  const mx = Math.max(0.0001, ...vals.map(Math.abs));
-                  return tr.map((t, i) => {
-                    const v = vals[i];
-                    const other = perfMode === "portfolio" ? t.benchmark : t.portfolio;
-                    return (
-                      <div key={t.period} className="vx-barcol">
-                        <div className="vx-barwrap">
-                          <div className={cls("vx-barv", v < 0 && "neg", t.period === "Today" && "hi live")} style={{ height: `${(Math.abs(v) / mx) * 100}%` }} />
-                        </div>
-                        <div className={cls("vx-barl", v >= 0 ? "up" : "dn")}>{pct(v, 1)}</div>
-                        <div className="vx-barp">{t.period}</div>
-                        <div className="vx-bart">{perfMode === "portfolio" ? "SPY" : "Basket"} {pct(other, 1)}</div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-              <div className="vx-foot">Today&apos;s picks over past windows — hindsight, not a backtest.</div>
-            </section>
-
-            <section className="vx-card">
-              <div className="vx-chead"><h3>Scanner Status</h3><span className="vx-ic">{I.plus}</span></div>
-              {report ? (
-                <div className="vx-status">
-                  {Object.entries(report.universe.by_index).map(([k, v]) => {
-                    const sub = report.stocks.filter((s) => s.index === k);
-                    const longs = sub.filter((s) => s.signal === "LONG").length;
-                    return (
-                      <div key={k} className="vx-st">
-                        <div className="vx-st-h"><span className="vx-dot ok" />{k} <span className="vx-muted">({v})</span></div>
-                        <div className="vx-st-box">
-                          <div><b>9-factor screen</b><div className="vx-muted sm">{sub.filter((s) => s.score != null).length} scored · {report.price_date}</div></div>
-                          <div className="vx-st-r"><span className="up">+{longs} LONG</span><div className="vx-muted sm">{sub.length - longs} other</div></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <button className="vx-more" onClick={() => { setView("terminal"); setBottomTab("console"); }}>SHOW SCAN LOG</button>
-                </div>
-              ) : <div className="vx-empty sm">No scan yet</div>}
-            </section>
-          </div>
-
-          <div className="vx-row2">
-            <section className="vx-card vx-alloc">
-              <div className="vx-alloc-h">
-                <h3>Model Portfolio by Sector</h3>
-                <div className="vx-cols"><span>HOLDING ▾</span><span>SHARES ▾</span><span>VALUE ▾</span><span>ALLOCATION ▾</span></div>
-              </div>
-              <div className="vx-alloc-b">
-                <div className="vx-alloc-ring">
-                  <Ring size={290} stroke={22} gap={0.05} icons
-                    segs={sectors.map((s) => ({ v: s.weight, c: sc(s.sector), label: SECTOR_CODE[s.sector] || s.sector.slice(0, 2).toUpperCase() }))}>
-                    <div className="vx-big"><b>{port?.holdings.length || 0}</b> STOCKS</div>
-                    <div className="vx-muted sm">in</div>
-                    <div className="vx-big"><b>{sectors.length}</b> SECTORS</div>
-                  </Ring>
-                </div>
-                <div className="vx-tree">
-                  {sectors.map((s) => (
-                    <div key={s.sector} className="vx-grp">
-                      <div className="vx-grp-h">
-                        <span className="vx-li-s"><span className="vx-sq" style={{ background: sc(s.sector) }} /><b>{s.sector}</b></span>
-                        <span>{s.items.reduce((a, h) => a + h.shares, 0)}</span><span>{money(s.value, 2)}</span><span>{pct(s.weight, 1, false)}</span>
-                      </div>
-                      {s.items.map((h) => (
-                        <div key={h.symbol} className="vx-grp-i" onClick={() => { setSel(h.symbol); setView("terminal"); }}>
-                          <span className="vx-li-s"><span className="vx-elbow" /><Badge s={h} size={16} />{h.name} <span className="vx-muted">({tick(h.symbol)})</span></span>
-                          <span>{h.shares}</span><span><Tween v={h.shares * px(h)} fmt={(x) => money(x, 2)} /></span><span>{pct(h.weight, 1, false)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  {!!port && <div className="vx-grp-h cash"><span className="vx-li-s"><span className="vx-sq" style={{ background: "#5b6fb3" }} /><b>Cash reserve</b></span><span>—</span><span>{money(port.cash_weight * port.capital, 2)}</span><span>{pct(port.cash_weight, 1, false)}</span></div>}
-                </div>
-              </div>
-            </section>
-
-            <section className="vx-card vx-best">
-              <div className="vx-chead">
-                <h3>Top Ranked</h3>
-                <div className="vx-mini">
-                  <button className={cls(topMode === "score" && "on")} onClick={() => setTopMode("score")}>Score</button>
-                  <button className={cls(topMode === "momentum" && "on")} onClick={() => setTopMode("momentum")}>Momentum</button>
-                </div>
-              </div>
-              <div className="vx-best-l">
-                {topRanked.map((s) => (
-                    <div key={s.symbol} className="vx-bc" onClick={() => { setSel(s.symbol); setView("terminal"); }}>
-                      <div className="vx-bc-h">
-                        <span className="vx-li-s"><Badge s={s} size={20} /><b>{s.name}</b> <span className="vx-muted">({tick(s.symbol)})</span></span>
-                        <span className={(chg(s) || 0) >= 0 ? "up" : "dn"}>{pct(chg(s))}</span>
-                      </div>
-                      <div className="vx-bc-b">
-                        <div className="vx-muted sm">{topMode === "score" ? `Score ${fx(s.score, 1)}` : `6M ${pct(s.factors.momentum_6m?.value, 1)}`}<br />Price</div>
-                        <Spark data={[...s.spark, px(s)]} w={120} h={34} color={px(s) >= (s.spark?.[0] ?? 0) ? "#4f8cff" : "#ff4d6d"} />
-                        <div className="vx-bc-p"><span className="vx-muted sm">{s.currency}</span><b><Tween v={px(s)} fmt={(x) => fx(x)} /></b></div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </section>
-          </div>
-          <div className="vx-disc">
-            Research &amp; demonstration tool. Hypothetical $100k model portfolio built from a transparent factor ranking — not investment advice, no orders placed.
-            Data: {report?.source || "Yahoo Finance"}.
-          </div>
-        </main>
+        <PortfolioBuilder report={report} px={px} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
       )}
 
       {showMethod && report && (

@@ -220,6 +220,7 @@
 .vx-log .tg { font-weight: 700; }
 .t-init, .t-uni { color: #a78bfa; } .t-px { color: var(--cyan); } .t-fund { color: #6f9bff; } .t-fac, .t-rank { color: #f59e0b; }
 .t-score, .t-sig { color: #ffcf6b; } .t-lvl { color: var(--up); } .t-port { color: #f472b6; } .t-done { color: var(--up); } .t-err { color: var(--dn); }
+.t-ml { color: #c792ea; }
 .vx-caret { color: var(--acc); animation: vxpulse 0.8s infinite; }
 
 /* planner */
