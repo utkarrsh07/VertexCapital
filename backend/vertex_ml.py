@@ -170,3 +170,36 @@ def _ens(test: pd.DataFrame, preds: dict[str, np.ndarray]) -> pd.Series:
 
 def _spearman(a: pd.Series, b: pd.Series) -> float:
     return float(a.rank().corr(b.rank()))
+
+
+# ---------------------------------------------------------------- walk-forward
+def walk_forward(data: pd.DataFrame, log=print) -> pd.DataFrame:
+    dates = sorted(data["date"].unique())
+    labelled = [d for d in dates if data.loc[data["date"] == d, "fwd"].notna().mean() > 0.8]
+    oos = []
+    fit_at = None
+    preds_cache = None
+    for i, d in enumerate(labelled):
+        if i < MIN_TRAIN_DATES:
+            continue
+        # purge: the previous sample's 21-day label overlaps this date, so train only on dates <= i-2
+        train_dates = labelled[: i - 1]
+        if fit_at is None or (i - fit_at) >= RETRAIN_EVERY:
+            fit_at = i
+            train = data[data["date"].isin(train_dates) & data["fwd"].notna()]
+            block = data[data["date"].isin(labelled[i: i + RETRAIN_EVERY])]
+            t0 = time.time()
+            preds_cache = (block, _fit_predict(train, block))
+            log(f"fold {pd.Timestamp(d).date()}  train={len(train):,} rows ({len(train_dates)} months)  "
+                f"test={block['date'].nunique()} months  fit {time.time() - t0:.1f}s")
+        block, preds = preds_cache
+        mask = (block["date"] == d).values
+        t = block[mask].copy()
+        for name, p in preds.items():
+            t[f"p_{name}"] = p[mask]
+        oos.append(t)
+    if not oos:
+        return pd.DataFrame()
+    res = pd.concat(oos, ignore_index=True)
+    res["p_ens"] = _ens(res, {k: res[f"p_{k}"].values for k in _models()})
+    return res
