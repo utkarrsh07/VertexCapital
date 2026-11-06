@@ -268,49 +268,94 @@ def score_universe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def classify(row) -> str:
-    if pd.isna(row["score"]):
-        return "N/A"
-    if row["score"] >= 65 and row["price"] > row["sma50"]:
-        return "LONG"
-    if row["score"] >= 50:
-        return "WATCH"
-    return "AVOID"
+SIGNAL_TIERS = [(0.85, "STRONG BUY"), (0.65, "BUY"), (0.35, "HOLD"), (0.15, "REDUCE"), (0.0, "SELL")]
+W_ML, W_FUND = 0.55, 0.45
+MAX_NAMES = 20
+MAX_WEIGHT = 0.08
+MAX_SECTOR_WEIGHT = 0.25
+VOL_TARGET = 0.16
+RISK_AVERSION = 6.0
 
 
-def build_portfolio(df: pd.DataFrame) -> pd.DataFrame:
-    cands = df[df["signal"] == "LONG"].sort_values("score", ascending=False)
-    if len(cands) < 8:  # fall back to top scores if the LONG list is thin
-        cands = df[df["score"].notna()].sort_values("score", ascending=False)
-    picks, per_sector = [], {}
-    for _, r in cands.iterrows():
-        if per_sector.get(r["sector"], 0) >= MAX_PER_SECTOR:
-            continue
-        picks.append(r)
-        per_sector[r["sector"]] = per_sector.get(r["sector"], 0) + 1
-        if len(picks) >= MAX_NAMES:
+def composite_and_signals(df: pd.DataFrame, reg: dict | None) -> pd.DataFrame:
+    """Blend validated ML rank with fundamental rank; tiers are relative, so signals are decisive."""
+    df = df.copy()
+    df["fund_pct"] = df["score"].rank(pct=True)
+    has_ml = df["ml_pct"].notna() if "ml_pct" in df else pd.Series(False, index=df.index)
+    comp = np.where(has_ml & df["fund_pct"].notna(), W_ML * df.get("ml_pct", 0) + W_FUND * df["fund_pct"],
+                    np.where(has_ml, df.get("ml_pct", np.nan), df["fund_pct"]))
+    df["composite"] = pd.Series(comp, index=df.index).rank(pct=True) * 100
+    pr = df["composite"].rank(pct=True)
+
+    def tier(p):
+        if pd.isna(p):
+            return "N/A"
+        for cut, name in SIGNAL_TIERS:
+            if p > cut or cut == 0.0:
+                return name
+        return "SELL"
+    df["signal"] = pr.map(tier)
+    if reg and reg.get("state") == "RISK-OFF":
+        # trend filter in risk-off markets: no STRONG BUY below the 50-day average
+        weak = (df["signal"] == "STRONG BUY") & (df["price"] < df["sma50"])
+        df.loc[weak, "signal"] = "BUY"
+    return df
+
+
+def _project(w: np.ndarray, sectors: np.ndarray, cap: float, scap: float) -> np.ndarray:
+    w = np.clip(w, 0, cap)
+    for _ in range(60):
+        if w.sum() <= 0:
+            w = np.ones_like(w)
+        w = w / w.sum()
+        w = np.clip(w, 0, cap)
+        for sc in np.unique(sectors):
+            m = sectors == sc
+            t = w[m].sum()
+            if t > scap:
+                w[m] *= scap / t
+        if abs(w.sum() - 1) < 1e-6 and w.max() <= cap + 1e-9:
             break
-    if not picks:
-        return pd.DataFrame()
-    p = pd.DataFrame(picks).reset_index(drop=True)
-    raw = (p["score"] / 100.0) / p["atr_pct"].clip(lower=0.005)   # conviction / volatility
-    wts = raw / raw.sum() * INVESTED
-    for _ in range(50):  # iterative capping (name + sector), redistribute excess
-        wts = wts.clip(upper=MAX_WEIGHT)
-        sec = wts.groupby(p["sector"]).transform("sum")
-        over = sec > MAX_SECTOR_WEIGHT
-        wts[over] = wts[over] * MAX_SECTOR_WEIGHT / sec[over]
-        gap = INVESTED - wts.sum()
-        if gap < 1e-6:
-            break
-        free = (wts < MAX_WEIGHT - 1e-9) & (~over)
-        if not free.any():
-            break
-        wts[free] += gap * raw[free] / raw[free].sum()
-    p["weight"] = wts
+    return w / w.sum()
+
+
+def build_portfolio(df: pd.DataFrame, prices: dict[str, pd.DataFrame], reg: dict | None) -> tuple[pd.DataFrame, dict]:
+    """Long-only mean-variance optimisation with a Ledoit-Wolf covariance, name/sector caps and a volatility target."""
+    from sklearn.covariance import LedoitWolf
+    cands = df[df["signal"].isin(["STRONG BUY", "BUY"])].sort_values("composite", ascending=False).head(45)
+    if len(cands) < 8:
+        cands = df[df["composite"].notna()].sort_values("composite", ascending=False).head(45)
+    syms = [s for s in cands["symbol"] if s in prices]
+    cands = cands.set_index("symbol").loc[syms].reset_index()
+    rets = pd.DataFrame({s: prices[s]["Close"].pct_change() for s in syms}).tail(252).dropna(axis=1, thresh=200).fillna(0)
+    cands = cands[cands["symbol"].isin(rets.columns)].reset_index(drop=True)
+    rets = rets[cands["symbol"]]
+    cov = LedoitWolf().fit(rets.values).covariance_ * 252
+    if "exp_excess" in cands and cands["exp_excess"].notna().any():
+        mu = cands["exp_excess"].fillna(0).values * 12 + 0.04 * (cands["composite"].values / 100 - 0.5)
+    else:
+        mu = 0.08 * (cands["composite"].values / 100 - 0.5)
+    sec = cands["sector"].values
+    w = _project(np.ones(len(cands)) / len(cands), sec, MAX_WEIGHT, MAX_SECTOR_WEIGHT)
+    step = 0.5 / (RISK_AVERSION * np.linalg.eigvalsh(cov).max())
+    for _ in range(400):                                       # projected gradient ascent on mu'w - (lambda/2) w'Sw
+        w = _project(w + step * (mu - RISK_AVERSION * cov @ w), sec, MAX_WEIGHT, MAX_SECTOR_WEIGHT)
+    keep = np.argsort(-w)[:MAX_NAMES]
+    keep = keep[w[keep] > 0.005]
+    p = cands.iloc[keep].copy()
+    wk = _project(w[keep], sec[keep], MAX_WEIGHT * 1.25, MAX_SECTOR_WEIGHT)
+    sub = cov[np.ix_(keep, keep)]
+    vol = float(np.sqrt(wk @ sub @ wk))
+    exposure = min(INVESTED, (reg or {}).get("exposure", 1.0) * INVESTED, VOL_TARGET / vol if vol > 0 else INVESTED)
+    p["weight"] = wk * exposure
     p["value"] = p["weight"] * PORTFOLIO_CAPITAL
     p["shares"] = np.floor(p["value"] / p["price"])
-    return p.sort_values("weight", ascending=False)
+    beta = float(np.nansum(p["weight"] * p["beta_realized"].fillna(1.0)))
+    stats = {"ex_ante_vol": vol * exposure, "unlevered_vol": vol, "beta": beta, "invested": float(p["weight"].sum()),
+             "effective_n": float(1 / np.sum(wk ** 2)), "expected_excess_1m": float(np.sum(wk * cands.iloc[keep]["exp_excess"].fillna(0).values)) if "exp_excess" in cands else None,
+             "method": f"Mean-variance (risk aversion {RISK_AVERSION:g}), Ledoit-Wolf covariance, max {MAX_WEIGHT:.0%}/name, "
+                       f"{MAX_SECTOR_WEIGHT:.0%}/sector, {VOL_TARGET:.0%} volatility target, regime-scaled exposure"}
+    return p.sort_values("weight", ascending=False), stats
 
 
 def trailing_returns(port: pd.DataFrame, prices: dict[str, pd.DataFrame]) -> list[dict]:
@@ -390,23 +435,49 @@ def run(root: Path, limit: int | None, workers: int) -> int:
     for sec, g in df.groupby("sector"):
         mode = "sector-relative" if len(g) >= MIN_SECTOR_SIZE else "universe-relative"
         log("RANK", f"{sec:<24} n={len(g):<3} {mode}  median score {g['score'].median():.1f}")
-    df["signal"] = df.apply(classify, axis=1)
     scored = df[df["score"].notna()]
     log("SCORE", f"{len(scored)} scored, {len(df) - len(scored)} skipped (<{MIN_FACTORS} of 9 factors)")
     if len(scored) < 0.5 * len(df):
         log("WARN", "low fundamentals coverage (Yahoo rate limit?) - run the scan again; successful lookups are cached 24h")
-    top = scored.sort_values("score", ascending=False).head(10)
+
+    # ---------- machine-learning layer (walk-forward validated)
+    ml_report, reg = None, None
+    try:
+        import vertex_ml
+        res = vertex_ml.run_ml({s_: prices[s_] for s_ in usable + [BENCHMARK]},
+                               dict(zip(df["symbol"], df["sector"])), log=lambda m: log("ML", m))
+        if res:
+            sc = res["scores"]
+            df["ml_pct"] = df["symbol"].map(sc["ml_pct"])
+            df["exp_excess"] = df["symbol"].map(sc["exp_excess"])
+            df["hit_prob"] = df["symbol"].map(sc["hit_prob"])
+            df["ml_quintile"] = df["symbol"].map(sc["quintile"])
+            df["drivers"] = df["symbol"].map(sc["drivers"])
+            ml_report, reg = res["report"], res["report"]["regime"]
+    except Exception as exc:  # the screener still works on fundamentals alone
+        log("ML", f"model skipped: {type(exc).__name__}: {exc}")
+    if "ml_pct" not in df:
+        df["ml_pct"] = np.nan
+        df["exp_excess"] = np.nan
+        df["hit_prob"] = np.nan
+        df["ml_quintile"] = np.nan
+        df["drivers"] = None
+
+    df = composite_and_signals(df, reg)
+    top = df.sort_values("composite", ascending=False).head(10)
     for _, r in top.iterrows():
-        log("LEVELS", f"{r['symbol']:<9} score={r['score']:5.1f}  px={r['price']:.2f}  atr={r['atr']:.2f}  "
-                      f"entry={r['entry']:.2f} stop={r['stop']:.2f} target={r['target']:.2f}  R:R={r['rr']:.2f}")
+        log("LEVELS", f"{r['symbol']:<9} comp={r['composite']:5.1f} ml={100 * (r['ml_pct'] if pd.notna(r['ml_pct']) else 0):5.1f} "
+                      f"fund={r['score'] if pd.notna(r['score']) else 0:5.1f}  px={r['price']:.2f}  "
+                      f"entry={r['entry']:.2f} stop={r['stop']:.2f} target={r['target']:.2f}  {r['signal']}")
     sig = df["signal"].value_counts().to_dict()
     log("SIGNAL", "  ".join(f"{k}={v}" for k, v in sig.items()))
 
-    port = build_portfolio(df)
+    port, pstats = build_portfolio(df, prices, reg)
     trail = trailing_returns(port, prices) if len(port) else []
     if len(port):
         log("PORTF", f"{len(port)} names, invested {port['weight'].sum():.1%}, cash {1 - port['weight'].sum():.1%}, "
-                     f"max name {port['weight'].max():.1%}, sectors {port['sector'].nunique()}")
+                     f"max name {port['weight'].max():.1%}, sectors {port['sector'].nunique()}, "
+                     f"ex-ante vol {pstats['ex_ante_vol']:.1%}, beta {pstats['beta']:.2f}, effective N {pstats['effective_n']:.1f}")
         for _, r in port.iterrows():
             log("PORTF", f"{r['symbol']:<9} w={r['weight']:6.2%}  ${r['value']:>9,.0f}  {r['sector']}")
 
