@@ -602,3 +602,73 @@
 .th-carbon .vx-mark em { background: var(--txt); border-radius: 2px; font-family: "Archivo", sans-serif; }
 .th-carbon .vx-st.acc { color: var(--acc); }
 
+/* motion: keep value changes, drop decorative glow */
+.th-carbon .vx-tw.fu { text-shadow: none; background: rgba(69, 192, 138, 0.16); }
+.th-carbon .vx-tw.fd { text-shadow: none; background: rgba(229, 83, 75, 0.16); }
+.th-carbon .vx-seg { filter: none; }
+.th-carbon .vx-ring svg { animation: none; filter: saturate(0.75); }
+.th-carbon .vx-barv, .th-carbon .vx-barv.hi { background: #3a3f45; border-radius: 0; box-shadow: none; }
+.th-carbon .vx-barv.live { background: var(--acc); animation: vxgrow 0.9s cubic-bezier(.2,.8,.2,1) both; box-shadow: none; filter: none; }
+.th-carbon .vx-barv.neg { background: #7d2f2b; }
+.th-carbon .vx-barv.neg.live { background: var(--dn); }
+.th-carbon .vx-barwrap { border-bottom-color: var(--line2); }
+.th-carbon .vx-bart, .th-carbon .vx-foot, .th-carbon .vx-disc, .th-carbon .vx-setup-n { color: #555b61; }
+
+/* chart: map the classic blue to amber */
+.th-carbon .vx-chart [stroke="#4f8cff"] { stroke: var(--acc); }
+.th-carbon .vx-chart [fill="#4f8cff"] { fill: var(--acc); }
+.th-carbon .vx-spark [stroke="#4f8cff"] { stroke: var(--acc); }
+.th-carbon .vx-spark stop[stop-color="#4f8cff"] { stop-color: var(--acc); }
+.th-carbon .vx-grid { stroke: #15181b; }
+.th-carbon .vx-axis { font-family: "Archivo", sans-serif; fill: #6b7177; }
+.th-carbon .vx-ohlc { font-family: "Archivo", sans-serif; font-size: 11px; }
+.th-carbon .vx-sma { stroke: #9aa0a6; opacity: 0.6; }
+.th-carbon .vol { opacity: 0.16; }
+.th-carbon .vx-tag { font-family: "Archivo", sans-serif; }
+
+/* footer ticker */
+.th-carbon .vx-ticker { background: #020303; font-family: "Archivo", sans-serif; font-size: 11.5px; }
+.th-carbon .vx-ticker-k { background: transparent; color: var(--acc); padding: 0; font-weight: 750; }
+.th-carbon .vx-ticker-s, .th-carbon .vx-tape-i { color: #b9b5ad; }
+
+/* dashboard */
+.th-carbon .vx-ov-v { font-size: 20px; font-weight: 800; font-stretch: 112%; }
+.th-carbon .vx-lname { color: var(--mut); }
+.th-carbon .vx-lval { font-size: 13px; font-weight: 650; }
+.th-carbon .vx-lmoney { color: var(--txt); }
+.th-carbon .vx-mini button { color: var(--mut); border-radius: 2px; }
+.th-carbon .vx-mini button.on { color: var(--bg); background: var(--txt); box-shadow: none; }
+.th-carbon .vx-st-box { background: transparent; border-color: var(--line); border-radius: 2px; }
+.th-carbon .vx-more { color: var(--acc) !important; }
+.th-carbon .vx-big { color: var(--mut); font-size: 20px; font-stretch: 118%; }
+.th-carbon .vx-big b { font-weight: 850; }
+.th-carbon .vx-cols span { color: var(--mut); }
+.th-carbon .vx-tree { border-left-color: var(--line); }
+.th-carbon .vx-grp-h { background: var(--raise); border-color: var(--line); border-radius: 2px; }
+.th-carbon .vx-grp-h, .th-carbon .vx-grp-i { font-size: 12px; }
+.th-carbon .vx-grp-i { color: #c9c5be; }
+.th-carbon .vx-sq { border-radius: 1px; }
+.th-carbon .vx-bc { background: transparent; border-color: var(--line); border-radius: 2px; }
+.th-carbon .vx-bc:hover { border-color: var(--acc); }
+.th-carbon .vx-elbow { border-color: var(--line2); }
+
+/* market tab */
+.th-carbon .vx-ixc, .th-carbon .vx-br, .th-carbon .vx-mv, .th-carbon .vx-hm-card { border-radius: 3px; }
+.th-carbon .vx-ixh b { font-stretch: 118%; font-weight: 750; }
+.th-carbon .vx-ixp { font-size: 22px; font-weight: 800; font-stretch: 108%; }
+.th-carbon .vx-br-bar span { border-radius: 0; }
+.th-carbon .vx-br-bar .g { background: var(--up); }
+.th-carbon .vx-br-bar .r { background: var(--dn); }
+.th-carbon .vx-hm { background: #000; border-radius: 0; }
+.th-carbon .vx-hm-sec span { background: #000; color: #d8d4cc; font-weight: 750; letter-spacing: 0.02em; }
+.th-carbon .vx-hm-c b { font-stretch: 100%; text-shadow: none; }
+.th-carbon .vx-hm-c i { font-family: "Archivo", sans-serif; }
+.th-carbon .vx-hm-tip { background: #0b0d0f; border-radius: 3px; box-shadow: none; }
+.th-carbon .vx-hm-leg span { border-radius: 0; font-family: "Archivo", sans-serif; }
+.th-carbon .vx-mv th { color: var(--mut); }
+
+/* modal + scrollbars */
+.th-carbon .vx-modal { background: rgba(0, 0, 0, 0.75); backdrop-filter: none; }
+.th-carbon .vx-mgrid h4 { color: var(--acc); text-transform: none; letter-spacing: 0; font-size: 13px; font-stretch: 112%; }
+.th-carbon .vx-mtext p { color: #c9c5be; }
+.th-carbon ::-webkit-scrollbar-thumb { background: #2a2f34; border-radius: 0; }
