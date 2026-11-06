@@ -632,6 +632,14 @@ export default function VertexPage() {
   const [showMethod, setShowMethod] = useState(false);
   const [clock, setClock] = useState("");
   const consoleRef = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useState<"carbon" | "classic">("carbon");
+  useEffect(() => {
+    try { const t = localStorage.getItem("vx-theme"); if (t === "classic" || t === "carbon") setTheme(t); } catch {}
+  }, []);
+  const switchTheme = (t: "carbon" | "classic") => {
+    setTheme(t);
+    try { localStorage.setItem("vx-theme", t); } catch {}
+  };
   const [feed, setFeed] = useState<QuoteFeed | null>(null);
   const [nextIn, setNextIn] = useState(REFRESH_S);
   const [liveOn, setLiveOn] = useState(true);
@@ -820,7 +828,7 @@ export default function VertexPage() {
 
   /* ============================================================ render */
   return (
-    <div className="vx-root">
+    <div className={cls("vx-root", theme === "carbon" && "th-carbon")}>
       <div className="vx-bg" />
       <header className="vx-nav">
         <div className="vx-brand">{I.logo}<span>Vertex<b>Capital</b></span></div>
@@ -841,6 +849,8 @@ export default function VertexPage() {
           <span className="vx-ic">{I.bell}</span>
           <span className="vx-avatar">VC</span>
           <span className="vx-pill">RESEARCH</span>
+          <button className="vx-theme" onClick={() => switchTheme(theme === "carbon" ? "classic" : "carbon")}
+            title="Switch between the Carbon and Classic designs">{theme === "carbon" ? "Classic theme" : "Carbon theme"}</button>
         </div>
       </header>
 
