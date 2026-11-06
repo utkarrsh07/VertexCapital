@@ -8,7 +8,9 @@ type FactorVal = { value: number | null; pct: number | null };
 type Stock = {
   symbol: string; name: string; sector: string; index: string; currency: string;
   market_cap: number | null; price: number; change_1d: number | null; score: number | null;
-  signal: "LONG" | "WATCH" | "AVOID" | "N/A"; factor_count: number;
+  signal: string; factor_count: number; fund_score: number | null; ml_score: number | null;
+  exp_excess_1m: number | null; hit_prob: number | null; ml_quintile: number | null; drivers: [string, number][];
+  vol_1y: number | null; dividend_yield: number | null;
   value_score: number | null; growth_score: number | null; quality_score: number | null;
   factors: Record<string, FactorVal>; alpha: number | null; beta_realized: number | null;
   atr: number; atr_pct: number; sma20: number; sma50: number;
@@ -20,11 +22,30 @@ type Report = {
   universe: { requested: number; priced: number; scored: number; by_index: Record<string, number> };
   factors: { key: string; label: string; weight: number; higher_is_better: boolean; group: string }[];
   coverage: Record<string, number>; signals: Record<string, number>;
-  methodology: Record<string, string>; stocks: Stock[];
+  methodology: Record<string, string>; stocks: Stock[]; ml: MLReport | null; regime: Regime | null;
   portfolio: { capital: number; cash_weight: number; holdings: Holding[];
     trailing: { period: string; portfolio: number; benchmark: number | null }[]; trailing_note: string };
 };
 type Candle = [string, number, number, number, number, number];
+type Regime = { state: string; exposure: number; spy_vs_200d: number; vol_20d: number; drawdown_52w: number };
+type PerfStats = { cagr: number; vol: number; sharpe: number | null; max_dd: number; hit: number; months: number };
+type MLReport = {
+  models: string[]; ensemble: string; features: { key: string; label: string }[]; horizon_days: number;
+  retrain_every_months: number; min_train_months: number; cost_bps: number; samples: number; prediction_date: string;
+  importance: { feature: string; key: string; ridge: number; gbm: number }[]; regime: Regime; caveats: string[];
+  validation: {
+    ic: Record<"ridge" | "gbm" | "ens", { mean: number; std: number; hit: number; t: number }>; ic_t: number; evidence: string;
+    quintiles: { q: number; ann: number }[]; long_short_ann: number; top_net: PerfStats; universe: PerfStats; spy: PerfStats;
+    excess_t: number; avg_turnover: number | null; calibration: { quintile: number; mean_excess: number; hit_rate: number; n: number }[];
+    curve: [string, number, number, number][]; rolling_ic: [string, number][]; ic_series: [string, number][];
+    first_oos: string | null; last_oos: string | null; oos_months: number;
+  };
+};
+const SIG_CLASS: Record<string, string> = { "STRONG BUY": "s-sb", BUY: "s-b", HOLD: "s-h", REDUCE: "s-r", SELL: "s-s" };
+const SIG_SHORT: Record<string, string> = { "STRONG BUY": "Strong buy", BUY: "Buy", HOLD: "Hold", REDUCE: "Reduce", SELL: "Sell" };
+const sigCls = (s?: string | null) => SIG_CLASS[s || ""] || "s-na";
+const isBuy = (s?: string) => s === "STRONG BUY" || s === "BUY";
+const isSell = (s?: string) => s === "SELL" || s === "REDUCE";
 type Quote = { price: number; prevClose: number | null; change: number | null; open: number | null;
   high: number | null; low: number | null; volume: number | null; time: number; marketState: string };
 type QuoteFeed = { quotes: Record<string, Quote>; asOf: number; latencyMs: number; received: number; requested: number;
