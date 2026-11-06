@@ -956,6 +956,27 @@ export default function VertexPage() {
                   <div><b>{tick(stock.symbol)}</b><div className="vx-muted">{short(stock.sector)} · {stock.factor_count}/9 factors</div></div>
                   <div className="vx-score">{fx(stock.score, 1)}<small>/100</small></div>
                 </div>
+                <div className="vx-mlbox">
+                  <div className="vx-mlhead"><span className={cls("vx-sig", sigCls(stock.signal))}>{stock.signal}</span>
+                    <span className="vx-muted">{stock.ml_quintile ? `Model quintile ${stock.ml_quintile} of 5` : "No model score"}</span></div>
+                  {([["Machine-learning score", stock.ml_score], ["Fundamental score", stock.fund_score]] as const).map(([l, v]) => (
+                    <div key={l} className="vx-frow">
+                      <div className="vx-frow-t"><span>{l}</span><b>{fx(v, 0)}</b></div>
+                      <div className="vx-bar"><span style={{ width: `${v ?? 0}%`, opacity: v == null ? 0 : 1 }} /></div>
+                    </div>
+                  ))}
+                  <div className="vx-mlkv">
+                    <span>Expected 1-month excess</span><b className={(stock.exp_excess_1m ?? 0) >= 0 ? "up" : "dn"}>{pct(stock.exp_excess_1m, 2)}</b>
+                    <span>Beat the universe, historically</span><b>{stock.hit_prob == null ? "—" : pct(stock.hit_prob, 0, false)}</b>
+                  </div>
+                  {!!stock.drivers?.length && (
+                    <div className="vx-drv">
+                      {stock.drivers.map(([n, v]) => <span key={n} className={v >= 0 ? "up" : "dn"}>{v >= 0 ? "+" : "−"} {n}</span>)}
+                    </div>
+                  )}
+                  <div className="vx-frow-p">Expected excess and hit rate are this quintile&apos;s averages in out-of-sample testing, not a promise.</div>
+                </div>
+                <div className="vx-fsub">Fundamental factors</div>
                 {report?.factors.map((f) => {
                   const fv = stock.factors[f.key];
                   const p = fv?.pct;
