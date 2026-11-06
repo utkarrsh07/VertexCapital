@@ -463,6 +463,146 @@ function Breadth({ label, l, r, a, b }: { label: string; l: string; r: string; a
   );
 }
 
+function MarketView({ report, onOpen, clock }: { report: Report | null; onOpen: (s: string) => void; clock: string }) {
+  const [mk, setMk] = useState<MarketFeed | null>(null);
+  const [uni, setUni] = useState<"All" | "S&P 500" | "TSX 60">("S&P 500");
+  const [hover, setHover] = useState<{ s: Stock & { lp: number; lc: number | null }; x: number; y: number } | null>(null);
+  const [nextIn, setNextIn] = useState(20);
+  const [hmRef, { w: hw, h: hh }] = useSize<HTMLDivElement>();
+
+  const poll = useCallback(async (wait = false) => {
+    try { setMk(await fetch(`/api/vertex/market${wait ? "?wait=1" : ""}`, { cache: "no-store" }).then((r) => r.json())); } catch {}
+    setNextIn(20);
+  }, []);
+  useEffect(() => {
+    poll(true);
+    const id = setInterval(() => setNextIn((n) => { if (n <= 1) { poll(); return 20; } return n - 1; }), 1000);
+    return () => clearInterval(id);
+  }, [poll]);
+
+  const rows = useMemo(() => (report?.stocks || [])
+    .filter((s) => uni === "All" || s.index === uni)
+    .map((s) => { const lq = mk?.quotes[s.symbol.toUpperCase()]; return { ...s, lp: lq?.[0] ?? s.price, lc: lq ? lq[1] : s.change_1d, live: !!lq }; }), [report, mk, uni]);
+
+  const br = useMemo(() => {
+    let adv = 0, dec = 0, a50 = 0, b50 = 0, a20 = 0, b20 = 0, hi = 0, lo = 0;
+    for (const s of rows) {
+      if ((s.lc ?? 0) > 0) adv++; else if ((s.lc ?? 0) < 0) dec++;
+      if (s.lp >= s.sma50) a50++; else b50++;
+      if (s.lp >= s.sma20) a20++; else b20++;
+      if (s.spark?.length) { if (s.lp >= Math.max(...s.spark)) hi++; else if (s.lp <= Math.min(...s.spark)) lo++; }
+    }
+    return { adv, dec, a50, b50, a20, b20, hi, lo };
+  }, [rows]);
+
+  const tiles = useMemo(() => {
+    if (hw < 50 || hh < 50) return [];
+    const bySec = new Map<string, typeof rows>();
+    for (const s of rows) if (s.market_cap && s.market_cap > 0) { const g = bySec.get(s.sector) || []; g.push(s); bySec.set(s.sector, g); }
+    const secs = squarify([...bySec.entries()].map(([k, g]) => ({ v: g.reduce((a, s) => a + (s.market_cap || 0), 0), d: k })), { x: 0, y: 0, w: hw, h: hh });
+    return secs.map((sb) => {
+      const inner = { x: sb.x + 1, y: sb.y + 15, w: Math.max(0, sb.w - 2), h: Math.max(0, sb.h - 16) };
+      return { sector: sb.d, box: sb, cells: squarify((bySec.get(sb.d) || []).map((s) => ({ v: s.market_cap || 0, d: s })), inner) };
+    });
+  }, [rows, hw, hh]);
+
+  const movers = useMemo(() => {
+    const live = rows.filter((s) => s.lc != null).sort((a, b) => (b.lc as number) - (a.lc as number));
+    return { up: live.slice(0, 10), dn: live.slice(-10).reverse() };
+  }, [rows]);
+  const headline = mk?.indices["^GSPC"];
+  const isOpen = /REGULAR/.test(headline?.marketState || "");
+  const mtable = (list: typeof rows, title: string) => (
+    <section className="vx-card vx-mv">
+      <h3>{title}</h3>
+      <table>
+        <thead><tr><th>Ticker</th><th>Last</th><th>Change</th><th>Signal</th><th>Score</th></tr></thead>
+        <tbody>
+          {list.map((s) => (
+            <tr key={s.symbol} onClick={() => onOpen(s.symbol)}>
+              <td><span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b></span></td>
+              <td><Tween v={s.lp} fmt={(x) => fx(x)} /></td>
+              <td className={(s.lc ?? 0) >= 0 ? "up" : "dn"}>{pct(s.lc)}</td>
+              <td><span className={cls("vx-sig", s.signal)}>{s.signal}</span></td>
+              <td>{fx(s.score, 1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+
+  return (
+    <main className="vx-mkt">
+      <div className="vx-mhead">
+        <h1 className="vx-h1">Market Overview</h1>
+        <div className="vx-mhead-r">
+          <span className={cls("vx-badge2", isOpen && "live")}>{isOpen ? <><span className="vx-dot ok" />Market open</> : "Market closed"}</span>
+          <span className="vx-muted sm vx-num">{mk ? `${mk.coverage}/${report?.stocks.length || 0} quotes · ${mk.refreshing ? "refreshing…" : `next ${nextIn}s`}` : "connecting…"} · {clock}</span>
+        </div>
+      </div>
+      <div className="vx-idx">{INDEX_CARDS.map(([s, n]) => <IndexCard key={s} name={n} d={mk?.indices[s]} />)}</div>
+      <div className="vx-brs">
+        <Breadth label="Advancing / Declining" l="Advancing" r="Declining" a={br.adv} b={br.dec} />
+        <Breadth label="60-Day High / Low" l="New High" r="New Low" a={br.hi} b={br.lo} />
+        <Breadth label="SMA 20" l="Above" r="Below" a={br.a20} b={br.b20} />
+        <Breadth label="SMA 50" l="Above" r="Below" a={br.a50} b={br.b50} />
+      </div>
+      <div className="vx-mrow">
+        <section className="vx-card vx-hm-card">
+          <div className="vx-chead">
+            <h3>{uni === "All" ? "Universe" : uni} · 1-Day Performance <span className="vx-muted sm">size = market cap</span></h3>
+            <div className="vx-mini">
+              {(["S&P 500", "TSX 60", "All"] as const).map((u) => <button key={u} className={cls(uni === u && "on")} onClick={() => setUni(u)}>{u}</button>)}
+            </div>
+          </div>
+          <div className="vx-hm" ref={hmRef} onMouseLeave={() => setHover(null)}>
+            {tiles.map((t) => (
+              <div key={t.sector}>
+                <div className="vx-hm-sec" style={{ left: t.box.x, top: t.box.y, width: t.box.w, height: t.box.h }}>
+                  <span>{t.box.w > 60 ? t.sector.toUpperCase() : ""}</span>
+                </div>
+                {t.cells.map((c) => {
+                  const area = c.w * c.h, fs = Math.max(8, Math.min(30, Math.sqrt(area) / 4.2));
+                  return (
+                    <div key={c.d.symbol} className="vx-hm-c" style={{ left: c.x, top: c.y, width: c.w, height: c.h, background: heat(c.d.lc) }}
+                      onClick={() => onOpen(c.d.symbol)}
+                      onMouseMove={(e) => { const r = (e.currentTarget.parentElement?.parentElement as HTMLElement).getBoundingClientRect(); setHover({ s: c.d, x: e.clientX - r.left, y: e.clientY - r.top }); }}>
+                      {c.w > 26 && c.h > 16 && <b style={{ fontSize: fs }}>{tick(c.d.symbol)}</b>}
+                      {c.w > 34 && c.h > 30 && <i style={{ fontSize: Math.max(8, fs * 0.5) }}>{pct(c.d.lc)}</i>}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {hover && (
+              <div className="vx-hm-tip" style={{ left: Math.min(hover.x + 14, hw - 230), top: Math.min(hover.y + 14, hh - 130) }}>
+                <div className="vx-li-s"><Badge s={hover.s} size={18} /><b>{tick(hover.s.symbol)}</b><span className="vx-muted">{hover.s.name}</span></div>
+                <div className="vx-hm-tip-g">
+                  <span>Last</span><b>{fx(hover.s.lp)}</b>
+                  <span>Change</span><b className={(hover.s.lc ?? 0) >= 0 ? "up" : "dn"}>{pct(hover.s.lc)}</b>
+                  <span>Score</span><b>{fx(hover.s.score, 1)} <em className={cls("vx-sig", hover.s.signal)}>{hover.s.signal}</em></b>
+                  <span>Mkt cap</span><b>{hover.s.market_cap ? `${(hover.s.market_cap / 1e9).toFixed(1)}B ${hover.s.currency}` : "—"}</b>
+                </div>
+                <div className="vx-muted sm">Click to open in Strategy Terminal</div>
+              </div>
+            )}
+            {!report && <div className="vx-empty">Run a scan first</div>}
+          </div>
+          <div className="vx-hm-leg">
+            {[-0.03, -0.02, -0.01, 0, 0.01, 0.02, 0.03].map((v) => <span key={v} style={{ background: heat(v) }}>{v > 0 ? "+" : ""}{(v * 100).toFixed(0)}%</span>)}
+          </div>
+        </section>
+        <div className="vx-mside">
+          {mtable(movers.up, "Top Gainers")}
+          {mtable(movers.dn, "Top Losers")}
+        </div>
+      </div>
+      <div className="vx-disc">Quotes from Yahoo Finance, ~15 min delayed. Breadth and heatmap cover the VertexCapital universe ({uni}), not the full exchange.</div>
+    </main>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
