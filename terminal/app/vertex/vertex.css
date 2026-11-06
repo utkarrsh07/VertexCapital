@@ -485,6 +485,19 @@
   .vx-idx, .vx-brs { grid-template-columns: 1fr 1fr; }
   .vx-mrow { grid-template-columns: 1fr; }
 }
+
+/* =================== V20: signals, model tab, portfolio builder =================== */
+.vx-root { --raise: #0d1840; --sel: rgba(79, 140, 255, 0.12); }
+.vx-sig.s-sb { color: var(--up); font-weight: 750; }
+.vx-sig.s-b { color: var(--up); }
+.vx-sig.s-h { color: var(--mut); }
+.vx-sig.s-r { color: #e8915b; }
+.vx-sig.s-s { color: var(--dn); font-weight: 750; }
+.vx-sig.s-na { color: var(--mut); }
+.vx-pad { padding: 14px 16px; }
+.vx-mt { margin-top: 16px !important; }
+.vx-h3 { font-size: 15px; font-weight: 650; margin: 18px 0 10px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+
 /* theme switch button (both themes) */
 .vx-theme { font-size: 11px !important; color: var(--mut) !important; padding: 4px 8px !important; border-radius: 4px; border: 1px solid var(--line2) !important; }
 .vx-theme:hover { color: var(--txt) !important; }
