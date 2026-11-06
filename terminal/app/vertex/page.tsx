@@ -25,6 +25,13 @@ type Report = {
     trailing: { period: string; portfolio: number; benchmark: number | null }[]; trailing_note: string };
 };
 type Candle = [string, number, number, number, number, number];
+type Quote = { price: number; prevClose: number | null; change: number | null; open: number | null;
+  high: number | null; low: number | null; volume: number | null; time: number; marketState: string };
+type QuoteFeed = { quotes: Record<string, Quote>; asOf: number; latencyMs: number; received: number; requested: number;
+  intraday: { symbol: string; points: [number, number][] } | null; error?: string };
+const TAPE = ["SPY", "QQQ", "DIA", "IWM", "^VIX", "XIU.TO"];
+const TAPE_NAME: Record<string, string> = { SPY: "S&P 500", QQQ: "NASDAQ 100", DIA: "DOW 30", IWM: "RUSSELL 2K", "^VIX": "VIX", "XIU.TO": "TSX 60" };
+const REFRESH_S = 15;
 
 /* ============================================================ helpers */
 const SECTOR_COLORS: Record<string, string> = {
@@ -53,6 +60,30 @@ const pct = (v: number | null | undefined, d = 2, sign = true) =>
   v == null || !isFinite(v) ? "—" : `${sign && v > 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
 const money = (v: number, d = 0) => "$" + fx(v, d);
 const cls = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
+
+/** Number that animates to its new value and flashes green/red when it changes. */
+function Tween({ v, fmt, className, flash = true }: { v: number | null | undefined; fmt: (x: number) => string; className?: string; flash?: boolean }) {
+  const [shown, setShown] = useState(v ?? null);
+  const [dir, setDir] = useState<"" | "fu" | "fd">("");
+  const prev = useRef(v ?? null);
+  useEffect(() => {
+    const from = prev.current, to = v ?? null;
+    prev.current = to;
+    if (to == null || from == null || from === to) { setShown(to); return; }
+    if (flash) { setDir(to > from ? "fu" : "fd"); }
+    const t0 = performance.now(), dur = 700;
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      setShown(from + (to - from) * e);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    const clear = setTimeout(() => setDir(""), 1200);
+    return () => { cancelAnimationFrame(raf); clearTimeout(clear); };
+  }, [v, flash]);
+  return <span className={cls("vx-tw", dir, className)}>{shown == null ? "—" : fmt(shown)}</span>;
+}
 
 function factorDisplay(key: string, v: number | null) {
   if (v == null) return "n/a";
