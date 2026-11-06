@@ -281,3 +281,89 @@ def regime(spy: pd.Series) -> dict:
     else:
         state, exposure = "NEUTRAL", 0.85
     return {"state": state, "exposure": exposure, "spy_vs_200d": px / ma200 - 1, "vol_20d": vol20, "drawdown_52w": dd}
+
+
+def run_ml(prices: dict[str, pd.DataFrame], sectors: dict[str, str], log=print, bench: str = "SPY") -> dict | None:
+    """Returns {'scores': DataFrame(symbol -> ml_pct, exp_excess, hit_prob, drivers), 'report': {...}}"""
+    close, volume = build_panel(prices, bench)
+    if len(close) < 252 + HORIZON * (MIN_TRAIN_DATES + 4):
+        log(f"not enough history for walk-forward ({len(close)} sessions)")
+        return None
+    t0 = time.time()
+    data, feats, beta = build_dataset(close, volume, sectors, bench)
+    log(f"panel {close.shape[0]} sessions x {close.shape[1] - 1} stocks -> {len(data):,} samples, "
+        f"{data['date'].nunique()} monthly cross-sections, {len(FEATURES)} features ({time.time() - t0:.1f}s)")
+    oos = walk_forward(data, log)
+    if oos.empty:
+        log("walk-forward produced no out-of-sample predictions")
+        return None
+    spy_c = close[bench]
+    bench_fwd = (spy_c.shift(-HORIZON) / spy_c - 1)
+    ev = evaluate(oos, bench_fwd)
+    e = ev["ic"]["ens"]
+    log(f"OOS {ev['oos_months']} months: rank IC {e['mean']:+.4f} (t={ev['ic_t']:.2f}, hit {e['hit']:.0%})  "
+        f"ridge {ev['ic']['ridge']['mean']:+.4f}  gbm {ev['ic']['gbm']['mean']:+.4f}")
+    tn, un = ev["top_net"], ev["universe"]
+    if tn and un:
+        log(f"top quintile net of {COST_BPS:.0f}bps: CAGR {tn['cagr']:+.1%} Sharpe {tn['sharpe']:.2f} maxDD {tn['max_dd']:.1%}  "
+            f"| equal-weight universe CAGR {un['cagr']:+.1%}  | evidence: {ev['evidence'].upper()}")
+
+    # ---- final model on all labelled dates, predict newest cross-section
+    dates = sorted(data["date"].unique())
+    latest = dates[-1]
+    train = data[(data["date"] < dates[-2]) & data["fwd"].notna()]
+    test = data[data["date"] == latest].copy()
+    cols = [k for k, _ in FEATURES]
+    mdls = _models()
+    for name, mdl in mdls.items():
+        mdl.fit(train[cols].values, train["target"].values)
+        test[f"p_{name}"] = mdl.predict(test[cols].values)
+    test["ml_pct"] = (test["p_ridge"].rank(pct=True) + test["p_gbm"].rank(pct=True)) / 2
+    test["ml_pct"] = test["ml_pct"].rank(pct=True)
+    q = np.clip(np.ceil(test["ml_pct"] * 5), 1, 5).astype(int)
+    cal = {c["quintile"]: c for c in ev["calibration"]}
+    test["exp_excess"] = q.map(lambda k: cal[k]["mean_excess"])
+    test["hit_prob"] = q.map(lambda k: cal[k]["hit_rate"])
+    test["quintile"] = q
+    coef = mdls["ridge"].coef_
+    contrib = test[cols].values * coef
+
+    def drivers(row):
+        order = np.argsort(row)
+        pos = [(FEATURE_LABEL[cols[i]], float(row[i])) for i in order[::-1][:3] if row[i] > 0]
+        neg = [(FEATURE_LABEL[cols[i]], float(row[i])) for i in order[:2] if row[i] < 0]
+        return pos + neg
+    test["drivers"] = [drivers(r) for r in contrib]
+
+    # importance: |ridge coef| and GBM permutation importance on recent data
+    from sklearn.inspection import permutation_importance
+    recent = train[train["date"] >= dates[max(0, len(dates) - 26)]]
+    pi = permutation_importance(mdls["gbm"], recent[cols].values, recent["target"].values,
+                                n_repeats=3, random_state=7, scoring="r2")
+    imp = [{"feature": FEATURE_LABEL[c], "key": c, "ridge": float(coef[i]),
+            "gbm": float(pi.importances_mean[i])} for i, c in enumerate(cols)]
+    mr = max(abs(x["ridge"]) for x in imp) or 1.0
+    mg = max(abs(x["gbm"]) for x in imp) or 1.0
+    imp.sort(key=lambda d: -(abs(d["ridge"]) / mr + max(d["gbm"], 0) / mg))
+    reg = regime(spy_c)
+    log(f"regime {reg['state']}: SPY {reg['spy_vs_200d']:+.1%} vs 200d, 20d vol {reg['vol_20d']:.0%}, "
+        f"52w drawdown {reg['drawdown_52w']:.1%} -> target exposure {reg['exposure']:.0%}")
+    ann_vol = (-feats["vol_63"]).iloc[-1]
+    return {
+        "scores": test.set_index("symbol")[["ml_pct", "exp_excess", "hit_prob", "quintile", "drivers"]],
+        "beta": beta.iloc[-1], "vol": ann_vol,
+        "report": {
+            "models": ["Ridge regression (alpha=5)", "Histogram gradient boosting (250 trees, 15 leaves, min leaf 150)"],
+            "ensemble": "average of cross-sectional ranks",
+            "features": [{"key": k, "label": l} for k, l in FEATURES],
+            "horizon_days": HORIZON, "retrain_every_months": RETRAIN_EVERY, "min_train_months": MIN_TRAIN_DATES,
+            "cost_bps": COST_BPS, "samples": int(len(data)), "prediction_date": str(pd.Timestamp(latest).date()),
+            "validation": ev, "importance": imp, "regime": reg,
+            "caveats": [
+                "Universe is today's index members, so delisted and dropped stocks are missing (survivorship bias makes backtests look better than reality).",
+                "Prices are Yahoo adjusted closes, not a point-in-time database.",
+                "Only the price/volume model is backtested; the 9 fundamental factors use today's values and cannot be validated with free data.",
+                "Past out-of-sample performance does not guarantee future results.",
+            ],
+        },
+    }
