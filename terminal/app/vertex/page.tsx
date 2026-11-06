@@ -410,6 +410,48 @@ function heat(c: number | null | undefined) {
   return `rgb(${n.map((v, i) => Math.round(v + (to[i] - v) * t)).join(",")})`;
 }
 
+function IndexCard({ name, d }: { name: string; d?: IndexData }) {
+  const [ref, { w, h }] = useSize<HTMLDivElement>();
+  const pts = d?.points || [];
+  const up = (d?.change ?? 0) >= 0, col = up ? "#21d49a" : "#ff4d6d";
+  let path = "", area = "", prevY = 0, lastXY: [number, number] = [0, 0];
+  if (pts.length > 1 && w > 0) {
+    const vals = pts.map((p) => p[1]).concat(d?.prevClose != null ? [d.prevClose] : []);
+    const lo = Math.min(...vals), hi = Math.max(...vals), padv = (hi - lo) * 0.08 || 1;
+    const t0 = pts[0][0], t1 = Math.max(pts[pts.length - 1][0], t0 + 6.5 * 3600);
+    const X = (t: number) => ((t - t0) / (t1 - t0)) * (w - 52);
+    const Y = (v: number) => 6 + ((hi + padv - v) / (hi - lo + 2 * padv)) * (h - 22);
+    path = pts.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+    area = `${path}L${X(pts[pts.length - 1][0]).toFixed(1)},${h - 16}L0,${h - 16}Z`;
+    prevY = d?.prevClose != null ? Y(d.prevClose) : -10;
+    lastXY = [X(pts[pts.length - 1][0]), Y(pts[pts.length - 1][1])];
+  }
+  const id = "ix" + useId().replace(/[^a-zA-Z0-9]/g, "");
+  return (
+    <section className="vx-card vx-ixc">
+      <div className="vx-ixh">
+        <b>{name}</b>
+        <span className={up ? "up" : "dn"}>{d?.change != null && d.prevClose != null ? `${up ? "+" : ""}${fx(d.price - d.prevClose)} (${pct(d.change)})` : "—"}</span>
+      </div>
+      <div className="vx-ixp"><Tween v={d?.price} fmt={(x) => fx(x)} /></div>
+      <div className="vx-ixch" ref={ref}>
+        {pts.length > 1 ? (
+          <svg width={w} height={h}>
+            <defs><linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={col} stopOpacity=".28" /><stop offset="1" stopColor={col} stopOpacity="0" /></linearGradient></defs>
+            <line x1={0} x2={w - 52} y1={prevY} y2={prevY} stroke="#7482ad" strokeDasharray="3 3" opacity={0.6} />
+            <path d={area} fill={`url(#${id})`} />
+            <path d={path} fill="none" stroke={col} strokeWidth={1.6} className="vx-draw" pathLength={1} />
+            <circle cx={lastXY[0]} cy={lastXY[1]} r={3} fill={col} />
+            <circle cx={lastXY[0]} cy={lastXY[1]} r={3} fill="none" stroke={col} className="vx-pulse-ring" />
+            <text x={w - 48} y={prevY + 3} className="vx-axis">prev</text>
+            {["9:30", "12:00", "4:00"].map((t, i) => <text key={t} x={[0, (w - 52) * 0.385, w - 70][i]} y={h - 3} className="vx-axis">{t}</text>)}
+          </svg>
+        ) : <div className="vx-empty sm">Waiting for intraday data…</div>}
+      </div>
+    </section>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
