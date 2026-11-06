@@ -954,7 +954,7 @@ export default function VertexPage() {
                       {s.items.map((h) => (
                         <div key={h.symbol} className="vx-grp-i" onClick={() => { setSel(h.symbol); setView("terminal"); }}>
                           <span className="vx-li-s"><span className="vx-elbow" /><Badge s={h} size={16} />{h.name} <span className="vx-muted">({tick(h.symbol)})</span></span>
-                          <span>{h.shares}</span><span>{money(h.value, 2)}</span><span>{pct(h.weight, 1, false)}</span>
+                          <span>{h.shares}</span><span><Tween v={h.shares * px(h)} fmt={(x) => money(x, 2)} /></span><span>{pct(h.weight, 1, false)}</span>
                         </div>
                       ))}
                     </div>
@@ -973,19 +973,16 @@ export default function VertexPage() {
                 </div>
               </div>
               <div className="vx-best-l">
-                {[...scored]
-                  .sort((a, b) => topMode === "score" ? (b.score! - a.score!) : ((b.factors.momentum_6m?.value ?? -9) - (a.factors.momentum_6m?.value ?? -9)))
-                  .slice(0, 8)
-                  .map((s) => (
+                {topRanked.map((s) => (
                     <div key={s.symbol} className="vx-bc" onClick={() => { setSel(s.symbol); setView("terminal"); }}>
                       <div className="vx-bc-h">
                         <span className="vx-li-s"><Badge s={s} size={20} /><b>{s.name}</b> <span className="vx-muted">({tick(s.symbol)})</span></span>
-                        <span className={(s.change_1d || 0) >= 0 ? "up" : "dn"}>{pct(s.change_1d)}</span>
+                        <span className={(chg(s) || 0) >= 0 ? "up" : "dn"}>{pct(chg(s))}</span>
                       </div>
                       <div className="vx-bc-b">
                         <div className="vx-muted sm">{topMode === "score" ? `Score ${fx(s.score, 1)}` : `6M ${pct(s.factors.momentum_6m?.value, 1)}`}<br />Price</div>
-                        <Spark data={s.spark} w={120} h={34} color={(s.spark?.[s.spark.length - 1] ?? 0) >= (s.spark?.[0] ?? 0) ? "#4f8cff" : "#ff4d6d"} />
-                        <div className="vx-bc-p"><span className="vx-muted sm">{s.currency}</span><b>{fx(s.price)}</b></div>
+                        <Spark data={[...s.spark, px(s)]} w={120} h={34} color={px(s) >= (s.spark?.[0] ?? 0) ? "#4f8cff" : "#ff4d6d"} />
+                        <div className="vx-bc-p"><span className="vx-muted sm">{s.currency}</span><b><Tween v={px(s)} fmt={(x) => fx(x)} /></b></div>
                       </div>
                     </div>
                   ))}
