@@ -669,6 +669,138 @@ function LineChart({ series, height = 220, fmt, zero }: {
   );
 }
 
+/* ============================================================ model tab */
+const EVIDENCE_TEXT: Record<string, string> = {
+  strong: "The ranking predicted next-month returns consistently out of sample, and the top quintile beat the universe after costs with statistical significance.",
+  moderate: "The ranking showed a real but modest edge out of sample. Useful for tilting a diversified portfolio; not enough on its own to concentrate money.",
+  weak: "The out-of-sample edge is small and could be luck. Treat the model as one input, not a reason to trade.",
+  none: "No reliable out-of-sample edge. Rankings fall back mainly to fundamentals; do not rely on the model.",
+};
+
+function ModelView({ report }: { report: Report | null }) {
+  const ml = report?.ml;
+  if (!ml) {
+    return (
+      <main className="vx-model"><h1 className="vx-h1">Model</h1>
+        <section className="vx-card vx-pad"><p>No model results yet. Press <b>Run scan</b>: the first V20 scan downloads 5 years of prices and trains the model (a few minutes).</p></section>
+      </main>
+    );
+  }
+  const v = ml.validation, e = v.ic.ens, reg = ml.regime;
+  const kpis: [string, string, string?][] = [
+    ["Out-of-sample months", String(v.oos_months), `${v.first_oos} to ${v.last_oos}`],
+    ["Rank IC (ensemble)", `${e.mean >= 0 ? "+" : ""}${e.mean.toFixed(3)}`, `t-stat ${v.ic_t.toFixed(2)} · positive ${pct(e.hit, 0, false)} of months`],
+    ["Top quintile CAGR, net", pct(v.top_net?.cagr, 1), `after ${ml.cost_bps} bps per trade`],
+    ["Equal-weight universe", pct(v.universe?.cagr, 1), `SPY ${pct(v.spy?.cagr, 1)}`],
+    ["Top quintile Sharpe", fx(v.top_net?.sharpe, 2), `universe ${fx(v.universe?.sharpe, 2)}`],
+    ["Top quintile max drawdown", pct(v.top_net?.max_dd, 1), `monthly hit rate ${pct(v.top_net?.hit, 0, false)}`],
+  ];
+  const maxImp = Math.max(...ml.importance.map((i) => Math.abs(i.ridge)), 1e-9);
+  const maxG = Math.max(...ml.importance.map((i) => Math.max(i.gbm, 0)), 1e-9);
+  const maxQ = Math.max(...v.quintiles.map((q) => Math.abs(q.ann)), 1e-9);
+  return (
+    <main className="vx-model">
+      <div className="vx-mhead">
+        <h1 className="vx-h1">Model</h1>
+        <span className="vx-muted sm">Trained on {ml.samples.toLocaleString()} stock-months · predictions as of {ml.prediction_date}</span>
+      </div>
+      <section className={cls("vx-card vx-verdict", `ev-${v.evidence}`)}>
+        <div>
+          <span className="vx-ev">Evidence: {v.evidence}</span>
+          <p>{EVIDENCE_TEXT[v.evidence]}</p>
+        </div>
+        <div className="vx-regime">
+          <span>Market regime</span>
+          <b className={reg.state === "RISK-ON" ? "up" : reg.state === "RISK-OFF" ? "dn" : "vx-acc"}>{reg.state.replace("-", " ").toLowerCase()}</b>
+          <small>SPY {pct(reg.spy_vs_200d, 1)} vs 200-day · vol {pct(reg.vol_20d, 0, false)} · target exposure {pct(reg.exposure, 0, false)}</small>
+        </div>
+      </section>
+      <div className="vx-kpis">
+        {kpis.map(([k, val, sub]) => <section key={k} className="vx-card vx-kpi"><span>{k}</span><b>{val}</b>{sub && <small>{sub}</small>}</section>)}
+      </div>
+      <div className="vx-mgrid2">
+        <section className="vx-card vx-pad">
+          <h3>Out-of-sample growth of $1</h3>
+          <LineChart height={250} fmt={(x) => x.toFixed(2)} zero={1}
+            series={[
+              { name: "Top quintile (net)", color: "var(--acc)", pts: v.curve.map((c) => [c[0], c[1]]) },
+              { name: "Equal-weight universe", color: "var(--txt)", pts: v.curve.map((c) => [c[0], c[2]]), dash: true },
+              { name: "SPY", color: "var(--mut)", pts: v.curve.map((c) => [c[0], c[3]]), dash: true },
+            ]} />
+        </section>
+        <section className="vx-card vx-pad">
+          <h3>Annualised return by model quintile</h3>
+          <div className="vx-qbars">
+            {v.quintiles.map((q) => (
+              <div key={q.q} className="vx-qcol">
+                <div className="vx-qwrap"><div className={cls("vx-qbar", q.ann < 0 && "neg", q.q === 5 && "top")} style={{ height: `${(Math.abs(q.ann) / maxQ) * 100}%` }} /></div>
+                <b className={q.ann >= 0 ? "up" : "dn"}>{pct(q.ann, 1)}</b>
+                <span>{q.q === 1 ? "Q1 lowest" : q.q === 5 ? "Q5 highest" : `Q${q.q}`}</span>
+              </div>
+            ))}
+          </div>
+          <div className="vx-foot">Long Q5 / short Q1 spread: {pct(v.long_short_ann, 1)} a year (gross). A rising staircase means the ranking sorts winners from losers.</div>
+        </section>
+        <section className="vx-card vx-pad">
+          <h3>Information coefficient by month</h3>
+          <LineChart height={210} fmt={(x) => x.toFixed(2)} zero={0}
+            series={[
+              { name: "Monthly IC", color: "var(--up)", pts: v.ic_series, bars: true },
+              { name: "12-month average", color: "var(--acc)", pts: v.ic_series.map((p) => [p[0], v.rolling_ic.find((r) => r[0] === p[0])?.[1] ?? NaN] as [string, number]) },
+            ]} />
+          <div className="vx-foot">IC is the rank correlation between predictions and what actually happened next month. Above 0.03 consistently is considered useful in practice.</div>
+        </section>
+        <section className="vx-card vx-pad">
+          <h3>What drives the model</h3>
+          <div className="vx-imp">
+            <div className="vx-imp-h"><span>Feature</span><span>Linear weight</span><span>Tree importance</span></div>
+            {ml.importance.map((i) => (
+              <div key={i.key} className="vx-imp-r">
+                <span>{i.feature}</span>
+                <span className="vx-imp-b"><i className={i.ridge >= 0 ? "pos" : "neg"} style={{ width: `${(Math.abs(i.ridge) / maxImp) * 100}%` }} /></span>
+                <span className="vx-imp-b"><i className="tree" style={{ width: `${(Math.max(i.gbm, 0) / maxG) * 100}%` }} /></span>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="vx-card vx-pad">
+          <h3>Calibration</h3>
+          <table className="vx-mtab">
+            <thead><tr><th>Quintile</th><th>Avg 1-month excess</th><th>Beat universe</th><th>Observations</th></tr></thead>
+            <tbody>{v.calibration.map((c) => (
+              <tr key={c.quintile}><td>Q{c.quintile}</td><td className={c.mean_excess >= 0 ? "up" : "dn"}>{pct(c.mean_excess, 2)}</td><td>{pct(c.hit_rate, 1, false)}</td><td>{c.n.toLocaleString()}</td></tr>
+            ))}</tbody>
+          </table>
+          <div className="vx-foot">These are the numbers behind each stock&apos;s &quot;expected 1-month excess&quot; and &quot;beat the universe&quot; figures.</div>
+          <h3 className="vx-mt">Model comparison</h3>
+          <table className="vx-mtab">
+            <thead><tr><th>Model</th><th>Mean IC</th><th>t-stat</th><th>Positive months</th></tr></thead>
+            <tbody>{(["ridge", "gbm", "ens"] as const).map((m) => (
+              <tr key={m}><td>{m === "ridge" ? "Ridge (linear)" : m === "gbm" ? "Gradient boosting" : "Ensemble (used)"}</td>
+                <td>{v.ic[m].mean.toFixed(3)}</td><td>{v.ic[m].t.toFixed(2)}</td><td>{pct(v.ic[m].hit, 0, false)}</td></tr>
+            ))}</tbody>
+          </table>
+        </section>
+        <section className="vx-card vx-pad">
+          <h3>How it was tested</h3>
+          <ul className="vx-list2">
+            <li>{ml.features.length} price and volume features, ranked across stocks each month.</li>
+            <li>{ml.models.join("; ")}; {ml.ensemble}.</li>
+            <li>Walk-forward: starts after {ml.min_train_months} months of history, retrains every {ml.retrain_every_months} months, never sees the month it predicts.</li>
+            <li>A one-month purge gap stops training labels overlapping the test month.</li>
+            <li>Costs: {ml.cost_bps} bps each way on every change in the top quintile (average turnover {pct(v.avg_turnover, 0, false)} a month).</li>
+          </ul>
+          <h3 className="vx-mt">Before using real money</h3>
+          <ul className="vx-list2 warn">
+            {ml.caveats.map((c) => <li key={c}>{c}</li>)}
+            <li>Paper-trade the signals for 3 to 6 months and compare live results with this page before committing money.</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
