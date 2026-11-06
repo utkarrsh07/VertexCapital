@@ -850,8 +850,10 @@ export default function VertexPage() {
                     const rest = sectors.slice(3).reduce((a, s) => a + s.weight, 0) + (port?.cash_weight || 0);
                     return [...top, { v: rest, c: "#5b6fb3" }];
                   })()}>
-                  <div className="vx-ov-v">{money(port?.capital || 0)}</div>
-                  <div className="vx-muted sm">Model portfolio</div>
+                  <div className="vx-ov-v"><Tween v={liveValue?.total ?? port?.capital ?? 0} fmt={(x) => money(x)} /></div>
+                  <div className={cls("sm", (liveValue?.today || 0) >= 0 ? "up" : "dn")}>
+                    {liveValue && feed?.received ? `${liveValue.today >= 0 ? "+" : "-"}${money(Math.abs(liveValue.today))} today` : "Model portfolio"}
+                  </div>
                 </Ring>
                 <div className="vx-legend">
                   {sectors.slice(0, 3).map((s, i) => (
@@ -878,9 +880,11 @@ export default function VertexPage() {
                   <button className={cls(perfMode === "benchmark" && "on")} onClick={() => setPerfMode("benchmark")}>SPY</button>
                 </div>
               </div>
-              <div className="vx-bars">
+              <div className="vx-bars" style={{ gridTemplateColumns: `repeat(${(port?.trailing.length || 4) + (feed?.received ? 1 : 0)}, 1fr)` }}>
                 {(() => {
-                  const tr = port?.trailing || [];
+                  const spy = q("SPY")?.change ?? null;
+                  const tr = [...(port?.trailing || []),
+                    ...(liveValue && feed?.received ? [{ period: "Today", portfolio: liveValue.todayPct, benchmark: spy }] : [])];
                   const vals = tr.map((t) => (perfMode === "portfolio" ? t.portfolio : t.benchmark) ?? 0);
                   const mx = Math.max(0.0001, ...vals.map(Math.abs));
                   return tr.map((t, i) => {
@@ -889,7 +893,7 @@ export default function VertexPage() {
                     return (
                       <div key={t.period} className="vx-barcol">
                         <div className="vx-barwrap">
-                          <div className={cls("vx-barv", v < 0 && "neg", i === tr.length - 1 && "hi")} style={{ height: `${(Math.abs(v) / mx) * 100}%` }} />
+                          <div className={cls("vx-barv", v < 0 && "neg", t.period === "Today" && "hi live")} style={{ height: `${(Math.abs(v) / mx) * 100}%` }} />
                         </div>
                         <div className={cls("vx-barl", v >= 0 ? "up" : "dn")}>{pct(v, 1)}</div>
                         <div className="vx-barp">{t.period}</div>
