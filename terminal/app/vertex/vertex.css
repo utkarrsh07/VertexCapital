@@ -508,6 +508,13 @@
 .vx-drv { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 10.5px; margin: 4px 0 6px; }
 .vx-fsub { font-size: 11px; color: var(--mut); margin: 4px 2px 2px; }
 
+/* shared line chart */
+.vx-lc { position: relative; }
+.vx-lc svg { display: block; }
+.vx-lc-leg { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; margin-top: 6px; color: var(--mut); }
+.vx-lc-leg i { display: inline-block; width: 10px; height: 2px; margin-right: 5px; vertical-align: middle; }
+.vx-lc-leg b { color: var(--txt); font-weight: 600; }
+
 /* theme switch button (both themes) */
 .vx-theme { font-size: 11px !important; color: var(--mut) !important; padding: 4px 8px !important; border-radius: 4px; border: 1px solid var(--line2) !important; }
 .vx-theme:hover { color: var(--txt) !important; }
