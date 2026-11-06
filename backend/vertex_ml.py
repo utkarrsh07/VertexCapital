@@ -203,3 +203,67 @@ def walk_forward(data: pd.DataFrame, log=print) -> pd.DataFrame:
     res = pd.concat(oos, ignore_index=True)
     res["p_ens"] = _ens(res, {k: res[f"p_{k}"].values for k in _models()})
     return res
+
+
+def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series) -> dict:
+    by = oos.groupby("date")
+    ic = {m: by.apply(lambda g, m=m: _spearman(g[f"p_{m}"], g["fwd_ex"]), include_groups=False) for m in ("ridge", "gbm", "ens")}
+    ens_ic = ic["ens"]
+    oos = oos.copy()
+    oos["q"] = by["p_ens"].transform(lambda s: pd.qcut(s.rank(method="first"), 5, labels=False) + 1)
+    qret = oos.groupby(["date", "q"])["fwd"].mean().unstack()
+    ew = by["fwd"].mean()
+    # top-quintile portfolio with turnover costs
+    members = oos[oos["q"] == 5].groupby("date")["symbol"].apply(set)
+    prev, cost = None, []
+    for d, mem in members.items():
+        turn = 1.0 if prev is None else 1 - len(mem & prev) / max(len(mem), 1)
+        cost.append(2 * turn * COST_BPS / 1e4)    # sell + buy
+        prev = mem
+    top_net = qret[5] - pd.Series(cost, index=members.index)
+    spy = bench_fwd.reindex(qret.index)
+
+    def stats(r: pd.Series) -> dict:
+        r = r.dropna()
+        if len(r) < 3:
+            return {}
+        eq = (1 + r).cumprod()
+        yrs = len(r) * HORIZON / 252
+        ann = eq.iloc[-1] ** (1 / yrs) - 1
+        vol = r.std() * math.sqrt(252 / HORIZON)
+        dd = float((eq / eq.cummax() - 1).min())
+        return {"cagr": float(ann), "vol": float(vol), "sharpe": float(ann / vol) if vol > 0 else None,
+                "max_dd": dd, "hit": float((r > 0).mean()), "months": int(len(r))}
+
+    n = len(ens_ic.dropna())
+    t_stat = float(ens_ic.mean() / ens_ic.std() * math.sqrt(n)) if n > 2 and ens_ic.std() > 0 else 0.0
+    excess = (top_net - ew).dropna()
+    ex_t = float(excess.mean() / excess.std() * math.sqrt(len(excess))) if len(excess) > 2 and excess.std() > 0 else 0.0
+    calib = []
+    for q in range(1, 6):
+        sub = oos[oos["q"] == q]
+        calib.append({"quintile": q, "mean_excess": float(sub["fwd_ex"].mean()),
+                      "hit_rate": float((sub["fwd_ex"] > 0).mean()), "n": int(len(sub))})
+    strength = ("strong" if t_stat >= 3 and ex_t >= 2 else
+                "moderate" if t_stat >= 2 else
+                "weak" if t_stat >= 1 else "none")
+    curve = pd.DataFrame({"top_net": (1 + top_net).cumprod(), "universe": (1 + ew).cumprod(),
+                          "spy": (1 + spy.fillna(0)).cumprod()}).dropna(how="all")
+    roll = ens_ic.rolling(12, min_periods=6).mean()
+    return {
+        "ic": {m: {"mean": float(v.mean()), "std": float(v.std()), "hit": float((v > 0).mean()),
+                   "t": float(v.mean() / v.std() * math.sqrt(len(v))) if v.std() > 0 else 0.0} for m, v in ic.items()},
+        "ic_t": t_stat, "evidence": strength,
+        "quintiles": [{"q": int(q), "ann": float((1 + qret[q].mean()) ** (252 / HORIZON) - 1)} for q in qret.columns],
+        "long_short_ann": float((1 + (qret[5] - qret[1]).mean()) ** (252 / HORIZON) - 1),
+        "top_net": stats(top_net), "universe": stats(ew), "spy": stats(spy),
+        "excess_t": ex_t, "avg_turnover": float(np.mean(cost) / (2 * COST_BPS / 1e4)) if cost else None,
+        "calibration": calib,
+        "curve": [[str(pd.Timestamp(d).date()), round(float(a), 4), round(float(b), 4), round(float(c), 4)]
+                  for d, a, b, c in zip(curve.index, curve["top_net"], curve["universe"], curve["spy"])],
+        "rolling_ic": [[str(pd.Timestamp(d).date()), round(float(v), 4)] for d, v in roll.dropna().items()],
+        "ic_series": [[str(pd.Timestamp(d).date()), round(float(v), 4)] for d, v in ens_ic.dropna().items()],
+        "first_oos": str(pd.Timestamp(ens_ic.index.min()).date()) if n else None,
+        "last_oos": str(pd.Timestamp(ens_ic.index.max()).date()) if n else None,
+        "oos_months": n,
+    }
