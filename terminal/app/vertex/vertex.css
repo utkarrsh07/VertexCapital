@@ -429,3 +429,58 @@
 .vx-ticker-s { color: #b8c4ec; flex: none; }
 .vx-ticker-clock { color: var(--mut); }
 
+/* =================== V19.2: market tab =================== */
+.vx-mkt { padding: 14px 22px 30px; }
+.vx-mhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.vx-mhead .vx-h1 { margin: 0; }
+.vx-mhead-r { display: flex; align-items: center; gap: 12px; }
+.vx-idx { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.vx-ixc { padding: 12px 14px 8px; height: 190px; display: flex; flex-direction: column; }
+.vx-ixh { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.vx-ixh b { font-size: 15px; letter-spacing: 0.3px; }
+.vx-ixh span { font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+.vx-ixp { font-family: var(--mono); font-size: 20px; font-weight: 600; margin: 2px 0 4px; }
+.vx-ixch { position: relative; flex: 1; min-height: 0; }
+.vx-ixch svg { position: absolute; inset: 0; }
+.vx-brs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.vx-br { padding: 10px 14px 12px; }
+.vx-br-h, .vx-br-v { display: flex; justify-content: space-between; font-size: 11px; }
+.vx-br-h b { font-weight: 500; color: #c3cdf2; }
+.vx-br-v { font-family: var(--mono); font-size: 11.5px; margin: 3px 0 7px; }
+.vx-br-bar { display: flex; gap: 3px; height: 6px; }
+.vx-br-bar span { border-radius: 3px; transition: width 0.8s cubic-bezier(.2,.8,.2,1); animation: vxwidth 1s ease-out both; }
+.vx-br-bar .g { background: linear-gradient(90deg, #128a5f, #21d49a); }
+.vx-br-bar .r { background: linear-gradient(90deg, #ff4d6d, #9b2540); }
+.vx-mrow { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px; }
+.vx-hm-card { padding: 12px 14px; display: flex; flex-direction: column; }
+.vx-hm-card .vx-chead { margin-bottom: 8px; }
+.vx-hm { position: relative; height: 660px; background: #070c20; border-radius: 4px; overflow: hidden; }
+.vx-hm-sec { position: absolute; box-shadow: inset 0 0 0 1px #050a1c; }
+.vx-hm-sec span { display: block; height: 15px; line-height: 15px; padding-left: 4px; font-size: 9.5px; font-weight: 700; color: #e3e9ff;
+  background: #0f1838; letter-spacing: 0.4px; white-space: nowrap; overflow: hidden; }
+.vx-hm-c { position: absolute; box-shadow: inset 0 0 0 1px rgba(5, 10, 28, 0.85); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden; cursor: pointer; transition: background-color 0.9s, filter 0.15s; animation: vxfade 0.6s ease-out both; color: #fff; text-align: center; line-height: 1.05; }
+.vx-hm-c:hover { filter: brightness(1.3); z-index: 2; box-shadow: inset 0 0 0 2px #fff; }
+.vx-hm-c b { font-weight: 700; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.vx-hm-c i { font-style: normal; font-family: var(--mono); opacity: 0.92; margin-top: 2px; }
+.vx-hm-tip { position: absolute; z-index: 5; width: 220px; padding: 10px 12px; border-radius: 8px; background: rgba(10, 18, 48, 0.97); border: 1px solid var(--line2);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); pointer-events: none; }
+.vx-hm-tip-g { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 6px; font-size: 11.5px; }
+.vx-hm-tip-g span { color: var(--mut); }
+.vx-hm-tip-g b { text-align: right; font-family: var(--mono); font-weight: 500; }
+.vx-hm-tip-g em { font-style: normal; margin-left: 4px; }
+.vx-hm-leg { display: flex; justify-content: center; gap: 2px; margin-top: 8px; }
+.vx-hm-leg span { width: 44px; text-align: center; font-family: var(--mono); font-size: 10px; padding: 2px 0; border-radius: 2px; color: #fff; }
+.vx-mside { display: flex; flex-direction: column; gap: 12px; }
+.vx-mv { padding: 12px 14px; flex: 1; }
+.vx-mv h3 { margin-bottom: 6px; }
+.vx-mv table { width: 100%; border-collapse: collapse; }
+.vx-mv th { text-align: left; font-size: 10.5px; font-weight: 500; color: var(--mut); padding: 4px 4px; border-bottom: 1px solid var(--line); }
+.vx-mv td { padding: 5px 4px; font-family: var(--mono); font-size: 11px; border-bottom: 1px solid rgba(86, 116, 214, 0.07); }
+.vx-mv td:first-child { font-family: inherit; }
+.vx-mv tbody tr { cursor: pointer; animation: vxfade 0.35s ease-out both; }
+.vx-mv tbody tr:hover { background: rgba(79, 140, 255, 0.07); }
+@media (max-width: 1100px) {
+  .vx-idx, .vx-brs { grid-template-columns: 1fr 1fr; }
+  .vx-mrow { grid-template-columns: 1fr; }
+}
