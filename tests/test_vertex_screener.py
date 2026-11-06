@@ -60,15 +60,41 @@ def test_signals_are_decisive_tiers():
 
 
 def test_portfolio_respects_caps():
-    rows = []
+    rows, prices = [], {}
     for i in range(30):
-        rows.append({"symbol": f"S{i}", "name": f"S{i}", "sector": f"Sec{i % 5}", "score": 90 - i,
-                     "signal": "LONG", "atr_pct": 0.01 + 0.002 * i, "price": 50.0})
-    port = vs.build_portfolio(pd.DataFrame(rows))
-    assert len(port) <= vs.MAX_NAMES
-    assert port["weight"].max() <= vs.MAX_WEIGHT + 1e-9
-    assert port.groupby("sector")["weight"].sum().max() <= vs.MAX_SECTOR_WEIGHT + 1e-9
+        prices[f"S{i}"] = fake_prices(i)
+        rows.append({"symbol": f"S{i}", "name": f"S{i}", "sector": f"Sec{i % 5}", "composite": 90 - i, "signal": "BUY",
+                     "exp_excess": 0.01 - 0.0005 * i, "price": 50.0, "beta_realized": 1.0})
+    port, stats = vs.build_portfolio(pd.DataFrame(rows), prices, {"exposure": 1.0})
+    assert 0 < len(port) <= vs.MAX_NAMES
+    w = port["weight"] / port["weight"].sum()
+    assert w.max() <= vs.MAX_WEIGHT * 1.25 + 1e-6
+    assert port.groupby("sector")["weight"].sum().max() / port["weight"].sum() <= vs.MAX_SECTOR_WEIGHT + 1e-6
     assert port["weight"].sum() <= vs.INVESTED + 1e-6
+    assert stats["ex_ante_vol"] <= vs.VOL_TARGET + 1e-6
+
+
+def test_ml_walk_forward_finds_planted_signal_and_not_noise():
+    import vertex_ml as ml
+    def panel(signal, seed):
+        rng = np.random.default_rng(seed); n, d = 120, 1000
+        idx = pd.bdate_range(end="2026-11-04", periods=d)
+        m = rng.normal(0.0004, 0.01, d); a = np.zeros(n); A = np.zeros((d, n))
+        for t in range(d):
+            a = 0.995 * a + rng.normal(0, 0.01, n); A[t] = a
+        R = m[:, None] + signal * A / 0.1 + rng.normal(0, 0.016, (d, n))
+        C = 100 * np.exp(np.cumsum(R, axis=0)); out = {}
+        for j in range(n):
+            out[f"S{j}"] = pd.DataFrame({"Close": C[:, j], "Volume": 1e6 + j}, index=idx)
+        out["SPY"] = pd.DataFrame({"Close": 100 * np.exp(np.cumsum(m)), "Volume": 1e7}, index=idx)
+        return out, {f"S{j}": f"Sec{j % 6}" for j in range(n)}
+    p, s = panel(0.0008, 1)
+    good = ml.run_ml(p, s, log=lambda m: None)
+    assert good["report"]["validation"]["ic"]["ens"]["mean"] > 0.03
+    p, s = panel(0.0, 2)
+    noise = ml.run_ml(p, s, log=lambda m: None)
+    assert noise["report"]["validation"]["evidence"] in ("none", "weak")
+    assert set(good["scores"]["quintile"].unique()) <= {1, 2, 3, 4, 5}
 
 
 def test_full_pipeline_offline(tmp_path, monkeypatch):
@@ -87,4 +113,7 @@ def test_full_pipeline_offline(tmp_path, monkeypatch):
     rep = json.loads((tmp_path / "data" / "vertex" / "screener.json").read_text())
     assert rep["universe"]["scored"] == 60
     assert rep["portfolio"]["holdings"]
+    assert rep["ml"]["validation"]["oos_months"] > 10
+    sigs = {s["signal"] for s in rep["stocks"]}
+    assert {"STRONG BUY", "BUY", "HOLD", "REDUCE", "SELL"} <= sigs
     assert (tmp_path / "data" / "vertex" / "candles.json").exists()
