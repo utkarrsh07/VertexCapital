@@ -808,12 +808,32 @@ export default function VertexPage() {
           </div>
 
           <footer className="vx-ticker">
-            <span className="vx-ticker-k">ENGINE</span>
-            <span className="vx-ticker-v">{lastLine || "idle"}</span>
-            <span className="vx-ticker-k">UNIVERSE</span>
-            <span className="vx-ticker-v">{report ? `${report.universe.scored}/${report.universe.requested} scored` : "—"}</span>
-            <span className="vx-ticker-k">SIGNALS</span>
-            <span className="vx-ticker-v">{report ? Object.entries(report.signals).map(([k, v]) => `${k} ${v}`).join(" · ") : "—"}</span>
+            <span className="vx-ticker-k">{isOpen ? "LIVE" : "QUOTES"}</span>
+            <div className="vx-tape">
+              <div className="vx-tape-in">
+                {[0, 1].map((dup) => (
+                  <span key={dup} className="vx-tape-set" aria-hidden={dup === 1}>
+                    {[...TAPE, ...(port?.holdings.map((h) => h.symbol) || [])].map((t) => {
+                      const qq = q(t);
+                      return (
+                        <span key={t} className="vx-tape-i">
+                          <b>{TAPE_NAME[t] || tick(t)}</b>
+                          <Tween v={qq?.price} fmt={(x) => fx(x)} />
+                          <span className={(qq?.change || 0) >= 0 ? "up" : "dn"}>{qq?.change == null ? "" : `${qq.change >= 0 ? "▲" : "▼"} ${pct(qq.change, 2)}`}</span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <span className="vx-ticker-k">FEED</span>
+            <span className="vx-ticker-s">{feed ? `${feed.received}/${feed.requested} · ${feed.latencyMs}ms` : "—"}</span>
+            <span className="vx-ticker-k">NEXT</span>
+            <span className="vx-ticker-s">{liveOn ? `${String(nextIn).padStart(2, "0")}s` : "off"}</span>
+            <span className="vx-ticker-k">SCAN</span>
+            <span className="vx-ticker-s">{report ? `${report.universe.scored}/${report.universe.requested} · ${report.price_date}` : "—"}</span>
+            <span className="vx-ticker-s vx-ticker-clock">{clock}</span>
           </footer>
         </main>
       ) : (
