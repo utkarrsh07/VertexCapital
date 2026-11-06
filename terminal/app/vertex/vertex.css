@@ -552,6 +552,56 @@
 .vx-list2 { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 12px; line-height: 1.5; max-width: 75ch; }
 .vx-list2.warn li::marker { color: var(--dn); }
 
+/* portfolio builder */
+.vx-b-top { display: grid; grid-template-columns: 1.15fr 1fr 0.75fr; gap: 12px; align-items: start; }
+.vx-quiz { display: grid; gap: 14px; }
+.vx-q label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+.vx-opts2 { display: flex; flex-wrap: wrap; gap: 6px; }
+.vx-opts2 button { padding: 6px 11px !important; border: 1px solid var(--line2) !important; border-radius: 3px; color: var(--mut) !important; font-size: 12px; }
+.vx-opts2 button:hover { color: var(--txt) !important; }
+.vx-opts2 button.on { color: var(--txt) !important; border-color: var(--acc) !important; background: var(--sel) !important; }
+.vx-q2 { display: grid; grid-template-columns: 1.1fr 1fr 1.2fr; gap: 14px; }
+.vx-q2 .vx-input { gap: 6px; }
+.vx-prof-n { font-size: 26px; font-weight: 800; margin: 2px 0 8px; }
+.vx-meter { height: 5px; background: var(--line); margin-bottom: 5px; }
+.vx-meter i { display: block; height: 100%; background: linear-gradient(90deg, var(--up), var(--acc), var(--dn)); background-size: 300px 100%; transition: width 0.5s; }
+.vx-split { display: flex; height: 30px; margin: 14px 0 8px; font-size: 11.5px; }
+.vx-split div { display: flex; align-items: center; justify-content: center; gap: 4px; transition: width 0.5s; white-space: nowrap; overflow: hidden; }
+.vx-split .eq { background: var(--acc); color: var(--bg); }
+.vx-split .rs { background: var(--line2); color: var(--txt); }
+.vx-prof-t { font-size: 12px; line-height: 1.55; margin: 0; color: var(--txt); opacity: 0.85; }
+.vx-salloc { display: grid; gap: 5px; }
+.vx-sa { display: grid; grid-template-columns: 150px 1fr 38px 30px; gap: 8px; align-items: center; font-size: 11.5px; }
+.vx-sa > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vx-sa-b { position: relative; height: 8px; background: var(--line); }
+.vx-sa-b i { position: absolute; left: 0; top: 0; bottom: 0; transition: width 0.5s; }
+.vx-sa-b em { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--txt); opacity: 0.7; }
+.vx-sa b { text-align: right; font-weight: 650; }
+.vx-sa small { text-align: right; font-size: 10.5px; }
+.vx-sum-v { font-size: 28px; font-weight: 800; margin: 2px 0; }
+.vx-sum-g { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; margin: 16px 0 10px; font-size: 12px; }
+.vx-sum-g span { color: var(--mut); }
+.vx-sum-g b { font-weight: 650; text-align: right; }
+.vx-sum .vx-actions { justify-content: flex-start; gap: 20px; }
+.vx-secs { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.vx-sec { padding: 10px 12px; }
+.vx-sec-h { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; font-size: 12.5px; }
+.vx-sec-h > span:last-child { margin-left: auto; color: var(--mut); font-size: 11.5px; }
+.vx-pick { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--line); opacity: 0.6; transition: opacity 0.2s; }
+.vx-pick.on { opacity: 1; }
+.vx-pick:last-child { border-bottom: 0; }
+.vx-chk { width: 18px; height: 18px; border: 1px solid var(--line2) !important; border-radius: 2px; display: grid; place-items: center; font-size: 12px; color: var(--bg) !important; }
+.vx-pick.on .vx-chk { background: var(--acc) !important; border-color: var(--acc) !important; }
+.vx-chk:focus-visible, .vx-opts2 button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.vx-pick-n { min-width: 0; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vx-pick-m { display: flex; gap: 10px; font-size: 10.5px; color: var(--mut); margin-top: 2px; }
+.vx-pick-r { text-align: right; display: flex; flex-direction: column; font-size: 12px; }
+.vx-pick-r span { font-size: 10.5px; }
+@media (max-width: 1200px) {
+  .vx-kpis { grid-template-columns: repeat(3, 1fr); }
+  .vx-mgrid2, .vx-b-top, .vx-verdict { grid-template-columns: 1fr; }
+}
+
 /* theme switch button (both themes) */
 .vx-theme { font-size: 11px !important; color: var(--mut) !important; padding: 4px 8px !important; border-radius: 4px; border: 1px solid var(--line2) !important; }
 .vx-theme:hover { color: var(--txt) !important; }
