@@ -582,7 +582,7 @@ export default function VertexPage() {
                   <span className="vx-sym">
                     <Badge s={stock} size={18} /> <b>{tick(stock.symbol)}</b> <span className="vx-muted">{stock.name}</span>
                     <span className="vx-muted">· {stock.index} · {stock.currency}</span>
-                    <span className={cls("vx-chg", (stock.change_1d || 0) >= 0 ? "up" : "dn")}>{fx(stock.price)} {pct(stock.change_1d)}</span>
+                    <span className={cls("vx-chg", (chg(stock) || 0) >= 0 ? "up" : "dn")}><Tween v={px(stock)} fmt={(x) => fx(x)} /> {pct(chg(stock))}</span>
                   </span>
                 )}
               </div>
@@ -614,7 +614,7 @@ export default function VertexPage() {
                     <button key={s.symbol} className={cls("vx-li", s.symbol === sel && "sel")} onClick={() => setSel(s.symbol)}>
                       <span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b><span className="vx-muted">{s.index === "TSX 60" ? "TSX" : "US"}</span></span>
                       <span className={cls("vx-sig", s.signal)}>{s.signal === "LONG" ? "Long" : s.signal === "WATCH" ? "Watch" : "Avoid"}</span>
-                      <span className="vx-num">{fx(s[rankMode] as number, 1)}</span>
+                      <span className="vx-num">{fx(s[rankMode] as number, 1)}<small className={cls("vx-lc", (chg(s) || 0) >= 0 ? "up" : "dn")}>{pct(chg(s), 1)}</small></span>
                     </button>
                   ))}
                   {!ranked.length && <div className="vx-empty sm">No scored stocks</div>}
@@ -671,7 +671,7 @@ export default function VertexPage() {
                 <table>
                   <thead>
                     <tr>
-                      {[["symbol", "Symbol"], ["sector", "Sector"], ["signal", "Signal"], ["price", "Price"], ["entry", "Entry"], ["stop", "Stop"], ["target", "Target"], ["rr", "R:R"], ["alpha", "Alpha 1y"], ["score", "Score ▾"]].map(([k, l]) => (
+                      {[["symbol", "Symbol"], ["sector", "Sector"], ["signal", "Signal"], ["price", "Price"], ["change_1d", "Chg"], ["entry", "Entry"], ["stop", "Stop"], ["target", "Target"], ["rr", "R:R"], ["alpha", "Alpha 1y"], ["score", "Score ▾"]].map(([k, l]) => (
                         <th key={k} onClick={() => setSortKey(k)} className={cls(sortKey === k && "on")}>{l}</th>
                       ))}
                     </tr>
@@ -682,7 +682,8 @@ export default function VertexPage() {
                         <td><span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b></span></td>
                         <td className="vx-muted">{short(s.sector)}</td>
                         <td><span className={cls("vx-sig", s.signal)}>{s.signal}</span></td>
-                        <td>{fx(s.price)}</td>
+                        <td><Tween v={px(s)} fmt={(x) => fx(x)} /></td>
+                        <td className={(chg(s) || 0) >= 0 ? "up" : "dn"}>{pct(chg(s), 2)}</td>
                         <td className="c-entry">{fx(s.entry)}</td>
                         <td className="dn">{fx(s.stop)}</td>
                         <td className="up">{fx(s.target)}</td>
@@ -704,7 +705,7 @@ export default function VertexPage() {
                       <tr key={h.symbol} onClick={() => setSel(h.symbol)} className={cls(h.symbol === sel && "sel")}>
                         <td><span className="vx-li-s"><Badge s={h} size={16} /><b>{tick(h.symbol)}</b></span></td>
                         <td className="vx-muted">{h.name}</td><td className="vx-muted">{short(h.sector)}</td>
-                        <td>{fx(h.score, 1)}</td><td>{fx(h.price)}</td><td>{h.shares}</td><td>{money(h.value)}</td>
+                        <td>{fx(h.score, 1)}</td><td><Tween v={px(h)} fmt={(x) => fx(x)} /></td><td>{h.shares}</td><td><Tween v={h.shares * px(h)} fmt={(x) => money(x)} flash={false} /></td>
                         <td><span className="vx-wbar"><span style={{ width: `${h.weight * 1000}%` }} /></span>{pct(h.weight, 1, false)}</td>
                       </tr>
                     ))}
