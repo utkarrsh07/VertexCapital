@@ -545,7 +545,7 @@ function MarketView({ report, onOpen, clock }: { report: Report | null; onOpen: 
               <td><span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b></span></td>
               <td><Tween v={s.lp} fmt={(x) => fx(x)} /></td>
               <td className={(s.lc ?? 0) >= 0 ? "up" : "dn"}>{pct(s.lc)}</td>
-              <td><span className={cls("vx-sig", s.signal)}>{s.signal}</span></td>
+              <td><span className={cls("vx-sig", sigCls(s.signal))}>{s.signal}</span></td>
               <td>{fx(s.score, 1)}</td>
             </tr>
           ))}
@@ -603,7 +603,7 @@ function MarketView({ report, onOpen, clock }: { report: Report | null; onOpen: 
                 <div className="vx-hm-tip-g">
                   <span>Last</span><b>{fx(hover.s.lp)}</b>
                   <span>Change</span><b className={(hover.s.lc ?? 0) >= 0 ? "up" : "dn"}>{pct(hover.s.lc)}</b>
-                  <span>Score</span><b>{fx(hover.s.score, 1)} <em className={cls("vx-sig", hover.s.signal)}>{hover.s.signal}</em></b>
+                  <span>Score</span><b>{fx(hover.s.score, 1)} <em className={cls("vx-sig", sigCls(hover.s.signal))}>{hover.s.signal}</em></b>
                   <span>Mkt cap</span><b>{hover.s.market_cap ? `${(hover.s.market_cap / 1e9).toFixed(1)}B ${hover.s.currency}` : "—"}</b>
                 </div>
                 <div className="vx-muted sm">Click to open in Strategy Terminal</div>
@@ -758,7 +758,7 @@ export default function VertexPage() {
   }, [scored, rankMode, query]);
 
   const table = useMemo(() => {
-    const rows = scored.filter((s) => sigFilter === "ALL" || s.signal === sigFilter);
+    const rows = scored.filter((s) => sigFilter === "ALL" || (sigFilter === "BUY" ? isBuy(s.signal) : sigFilter === "SELL" ? isSell(s.signal) : s.signal === sigFilter));
     const k = sortKey as keyof Stock;
     return [...rows].sort((a, b) => {
       const av = a[k] as number | string | null, bv = b[k] as number | string | null;
@@ -942,7 +942,7 @@ export default function VertexPage() {
                   {ranked.map((s) => (
                     <button key={s.symbol} className={cls("vx-li", s.symbol === sel && "sel")} onClick={() => setSel(s.symbol)}>
                       <span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b><span className="vx-muted">{s.index === "TSX 60" ? "TSX" : "US"}</span></span>
-                      <span className={cls("vx-sig", s.signal)}>{s.signal === "LONG" ? "Long" : s.signal === "WATCH" ? "Watch" : "Avoid"}</span>
+                      <span className={cls("vx-sig", sigCls(s.signal))}>{SIG_SHORT[s.signal] || "—"}</span>
                       <span className="vx-num">{fx(s[rankMode] as number, 1)}<small className={cls("vx-lc", (chg(s) || 0) >= 0 ? "up" : "dn")}>{pct(chg(s), 1)}</small></span>
                     </button>
                   ))}
@@ -988,7 +988,7 @@ export default function VertexPage() {
               </div>
               {bottomTab === "levels" && (
                 <div className="vx-chips">
-                  {["ALL", "LONG", "WATCH", "AVOID"].map((f) => (
+                  {["ALL", "BUY", "HOLD", "SELL"].map((f) => (
                     <button key={f} className={cls(sigFilter === f && "on")} onClick={() => setSigFilter(f)}>{f}</button>
                   ))}
                 </div>
@@ -1010,7 +1010,7 @@ export default function VertexPage() {
                       <tr key={s.symbol} className={cls(s.symbol === sel && "sel")} onClick={() => setSel(s.symbol)}>
                         <td><span className="vx-li-s"><Badge s={s} size={16} /><b>{tick(s.symbol)}</b></span></td>
                         <td className="vx-muted">{short(s.sector)}</td>
-                        <td><span className={cls("vx-sig", s.signal)}>{s.signal}</span></td>
+                        <td><span className={cls("vx-sig", sigCls(s.signal))}>{s.signal}</span></td>
                         <td><Tween v={px(s)} fmt={(x) => fx(x)} /></td>
                         <td className={(chg(s) || 0) >= 0 ? "up" : "dn"}>{pct(chg(s), 2)}</td>
                         <td className="c-entry">{fx(s.entry)}</td>
@@ -1059,7 +1059,7 @@ export default function VertexPage() {
             <h3>Position Planner</h3>
             <div className="vx-opts">
               <div className="on"><span className="vx-dot ok" />Long only</div>
-              <div><span className={cls("vx-sig", stock?.signal || "N/A")}>{stock?.signal || "—"}</span>Signal</div>
+              <div><span className={cls("vx-sig", sigCls(stock?.signal || "N/A"))}>{stock?.signal || "—"}</span>Signal</div>
             </div>
             <label className="vx-lbl">Account size (USD, hypothetical)</label>
             <div className="vx-input">
