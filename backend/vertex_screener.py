@@ -436,7 +436,7 @@ def run(root: Path, limit: int | None, workers: int) -> int:
         mode = "sector-relative" if len(g) >= MIN_SECTOR_SIZE else "universe-relative"
         log("RANK", f"{sec:<24} n={len(g):<3} {mode}  median score {g['score'].median():.1f}")
     scored = df[df["score"].notna()]
-    log("SCORE", f"{len(scored)} scored, {len(df) - len(scored)} skipped (<{MIN_FACTORS} of 9 factors)")
+    log("SCORE", f"{len(scored)} fundamentally scored, {len(df) - len(scored)} with <{MIN_FACTORS} of 9 factors")
     if len(scored) < 0.5 * len(df):
         log("WARN", "low fundamentals coverage (Yahoo rate limit?) - run the scan again; successful lookups are cached 24h")
 
@@ -489,7 +489,13 @@ def run(root: Path, limit: int | None, workers: int) -> int:
             "symbol": r["symbol"], "name": r["name"], "sector": r["sector"], "index": r["index"],
             "currency": r["currency"], "market_cap": clean(r["market_cap"], 0),
             "price": clean(r["price"]), "change_1d": clean(r["change_1d"]),
-            "score": clean(r["score"], 2), "signal": r["signal"], "factor_count": int(r["factor_count"]),
+            "score": clean(r["composite"], 2), "fund_score": clean(r["score"], 2),
+            "ml_score": clean(100 * r["ml_pct"], 1) if pd.notna(r["ml_pct"]) else None,
+            "exp_excess_1m": clean(r["exp_excess"]), "hit_prob": clean(r["hit_prob"], 3),
+            "ml_quintile": int(r["ml_quintile"]) if pd.notna(r["ml_quintile"]) else None,
+            "drivers": [[n, round(v, 4)] for n, v in r["drivers"]] if isinstance(r["drivers"], list) else [],
+            "vol_1y": clean(r["vol_1y"]), "dividend_yield": clean(r["dividend_yield"]),
+            "signal": r["signal"], "factor_count": int(r["factor_count"]),
             "value_score": clean(r["value_score"], 1), "growth_score": clean(r["growth_score"], 1),
             "quality_score": clean(r["quality_score"], 1),
             "factors": {k: {"value": clean(r[k]), "pct": clean(r[f"{k}_pct"], 3)} for k, *_ in FACTORS},
@@ -514,17 +520,22 @@ def run(root: Path, limit: int | None, workers: int) -> int:
                        f"<{MIN_SECTOR_SIZE} names). Weighted average of available percentiles x 100; needs {MIN_FACTORS}/9 factors.",
             "levels": "Entry: pullback toward 20-day average (max 1.5 ATR below price). Stop: 2 ATR below entry or just under "
                       "20-day low. Target: 2R, or the 60-day high when it sits 1.5R-4R above entry.",
-            "signal": "LONG = score >= 65 and price above 50-day average; WATCH = score >= 50; AVOID otherwise.",
-            "portfolio": f"Top {MAX_NAMES} LONG names, max {MAX_PER_SECTOR}/sector, weight ~ score / ATR%, "
-                         f"capped {MAX_WEIGHT:.0%} per name and {MAX_SECTOR_WEIGHT:.0%} per sector, {INVESTED:.0%} invested.",
+            "composite": f"Score = {W_ML:.0%} machine-learning rank (price/volume model, walk-forward validated) + "
+                         f"{W_FUND:.0%} fundamental rank (9 sector-relative factors), re-ranked 0-100 across the universe.",
+            "signal": "Relative tiers by score: top 15% STRONG BUY, next 20% BUY, middle 30% HOLD, next 20% REDUCE, bottom 15% SELL. "
+                      "In a risk-off market regime, STRONG BUY also requires price above the 50-day average.",
+            "portfolio": pstats.get("method", "") if len(port) else "",
             "alpha": "Jensen's alpha vs SPY from 1 year of daily returns, annualised. Descriptive, not predictive.",
             "disclaimer": "Research and demonstration tool. Not investment advice. No trades are placed.",
         },
         "stocks": stocks,
+        "ml": ml_report,
+        "regime": reg,
         "portfolio": {
             "capital": PORTFOLIO_CAPITAL,
             "hypothetical": True,
             "cash_weight": clean(1 - float(port["weight"].sum()) if len(port) else 1.0),
+            "stats": {k: clean(v) if not isinstance(v, str) else v for k, v in pstats.items()} if len(port) else {},
             "holdings": [{"symbol": r["symbol"], "name": r["name"], "sector": r["sector"],
                           "weight": clean(r["weight"]), "value": clean(r["value"], 2), "shares": int(r["shares"]),
                           "price": clean(r["price"]), "score": clean(r["score"], 2)} for _, r in port.iterrows()],
