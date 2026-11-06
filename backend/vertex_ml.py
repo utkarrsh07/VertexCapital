@@ -141,3 +141,32 @@ def build_dataset(close, volume, sectors, bench="SPY"):
         rows.append(out)
     data = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
     return data, feats, beta
+
+
+# ---------------------------------------------------------------- models
+def _models():
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.linear_model import Ridge
+    return {
+        "ridge": Ridge(alpha=5.0),
+        "gbm": HistGradientBoostingRegressor(learning_rate=0.05, max_iter=250, max_leaf_nodes=15,
+                                             min_samples_leaf=150, l2_regularization=1.0, random_state=7),
+    }
+
+
+def _fit_predict(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, np.ndarray]:
+    cols = [k for k, _ in FEATURES]
+    out = {}
+    for name, mdl in _models().items():
+        mdl.fit(train[cols].values, train["target"].values)
+        out[name] = mdl.predict(test[cols].values)
+    return out
+
+
+def _ens(test: pd.DataFrame, preds: dict[str, np.ndarray]) -> pd.Series:
+    s = sum(pd.Series(p, index=test.index).groupby(test["date"]).rank(pct=True) for p in preds.values())
+    return s / len(preds)
+
+
+def _spearman(a: pd.Series, b: pd.Series) -> float:
+    return float(a.rank().corr(b.rank()))
