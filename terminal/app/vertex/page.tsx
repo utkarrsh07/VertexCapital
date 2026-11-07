@@ -700,6 +700,55 @@ function LineChart({ series, height = 220, fmt, zero, log = false }: {
   );
 }
 
+/* ============================================================ benchmark comparison */
+const BENCH_COLORS = ["#8ab4f8", "#c58af9", "#a8a29e", "#f28b82", "#81c995", "#78d9ec"];
+function BenchmarkChart({ ml }: { ml: MLReport }) {
+  const v = ml.validation;
+  const [logScale, setLogScale] = useState(true);
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const ours = { name: "VertexCapital strategy (net)", color: "#f5b54a", glow: true, area: true, stats: v.top_net, pts: v.curve.map((c) => [c[0], c[1]] as [string, number]) };
+  const uni = { name: "Equal-weight universe", color: "var(--txt)", dash: true, dim: true, stats: v.universe, pts: v.curve.map((c) => [c[0], c[2]] as [string, number]) };
+  const benches = (v.benchmarks || []).map((b, i) => ({ name: b.name, color: BENCH_COLORS[i % BENCH_COLORS.length], dim: true, stats: b.stats, pts: b.curve }));
+  const all = [ours, uni, ...benches];
+  const shown = all.filter((x) => !hidden[x.name]);
+  const years = (v.oos_months * ml.horizon_days) / 252;
+  const ranked = [...all].sort((a, b) => (b.stats?.cagr ?? -9) - (a.stats?.cagr ?? -9));
+  return (
+    <section className="vx-card vx-pad vx-bench">
+      <div className="vx-chead">
+        <h3>{years.toFixed(1)} years out of sample vs the major markets <span className="vx-muted sm">growth of $1, {v.first_oos} to {v.last_oos}</span></h3>
+        <div className="vx-mini">
+          <button className={cls(logScale && "on")} onClick={() => setLogScale(true)}>Log</button>
+          <button className={cls(!logScale && "on")} onClick={() => setLogScale(false)}>Linear</button>
+        </div>
+      </div>
+      <LineChart height={360} log={logScale} fmt={(x) => `$${x.toFixed(x < 10 ? 2 : 1)}`} zero={1}
+        series={[...shown.filter((x) => !("glow" in x)), ...shown.filter((x) => "glow" in x)]} />
+      <table className="vx-mtab vx-btab">
+        <thead><tr><th></th><th>Line</th><th>$1 became</th><th>CAGR</th><th>Volatility</th><th>Sharpe</th><th>Worst drawdown</th></tr></thead>
+        <tbody>
+          {ranked.map((x) => (
+            <tr key={x.name} className={cls(hidden[x.name] && "off", "glow" in x && "ours")} onClick={() => setHidden({ ...hidden, [x.name]: !hidden[x.name] })}>
+              <td><i className="vx-sw" style={{ background: x.color }} /></td>
+              <td>{x.name}</td>
+              <td>${fx(x.pts[x.pts.length - 1]?.[1], 2)}</td>
+              <td className={(x.stats?.cagr ?? 0) >= 0 ? "up" : "dn"}>{pct(x.stats?.cagr, 1)}</td>
+              <td>{pct(x.stats?.vol, 1, false)}</td>
+              <td>{fx(x.stats?.sharpe, 2)}</td>
+              <td className="dn">{pct(x.stats?.max_dd, 1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="vx-foot vx-left">
+        Click a row to hide or show its line. Benchmarks are ETFs with dividends reinvested; TSX is in CAD. The VertexCapital line only uses months the model had not trained on,
+        but its universe is today&apos;s index members, which leaves out companies that failed (survivorship bias, often 1 to 3% a year over a decade).
+        The fairest comparison is the dashed equal-weight universe, which has the same bias.
+      </div>
+    </section>
+  );
+}
+
 /* ============================================================ model tab */
 const EVIDENCE_TEXT: Record<string, string> = {
   strong: "The ranking predicted next-month returns consistently out of sample, and the top quintile beat the universe after costs with statistical significance.",
