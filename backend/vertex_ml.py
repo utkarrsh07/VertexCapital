@@ -205,7 +205,7 @@ def walk_forward(data: pd.DataFrame, log=print) -> pd.DataFrame:
     return res
 
 
-def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series) -> dict:
+def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series, others: dict[str, pd.Series] | None = None) -> dict:
     by = oos.groupby("date")
     ic = {m: by.apply(lambda g, m=m: _spearman(g[f"p_{m}"], g["fwd_ex"]), include_groups=False) for m in ("ridge", "gbm", "ens")}
     ens_ic = ic["ens"]
@@ -250,6 +250,14 @@ def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series) -> dict:
     curve = pd.DataFrame({"top_net": (1 + top_net).cumprod(), "universe": (1 + ew).cumprod(),
                           "spy": (1 + spy.fillna(0)).cumprod()}).dropna(how="all")
     roll = ens_ic.rolling(12, min_periods=6).mean()
+    benches = []
+    for name, fwd_b in (others or {}).items():
+        rb = fwd_b.reindex(qret.index)
+        if rb.notna().mean() < 0.9:
+            continue                       # not enough history to compare fairly
+        rb = rb.fillna(0)
+        benches.append({"name": name, "stats": stats(rb),
+                        "curve": [[str(pd.Timestamp(d).date()), round(float(v), 4)] for d, v in (1 + rb).cumprod().items()]})
     return {
         "ic": {m: {"mean": float(v.mean()), "std": float(v.std()), "hit": float((v > 0).mean()),
                    "t": float(v.mean() / v.std() * math.sqrt(len(v))) if v.std() > 0 else 0.0} for m, v in ic.items()},
@@ -261,6 +269,7 @@ def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series) -> dict:
         "calibration": calib,
         "curve": [[str(pd.Timestamp(d).date()), round(float(a), 4), round(float(b), 4), round(float(c), 4)]
                   for d, a, b, c in zip(curve.index, curve["top_net"], curve["universe"], curve["spy"])],
+        "benchmarks": benches,
         "rolling_ic": [[str(pd.Timestamp(d).date()), round(float(v), 4)] for d, v in roll.dropna().items()],
         "ic_series": [[str(pd.Timestamp(d).date()), round(float(v), 4)] for d, v in ens_ic.dropna().items()],
         "first_oos": str(pd.Timestamp(ens_ic.index.min()).date()) if n else None,
