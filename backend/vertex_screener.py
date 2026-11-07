@@ -324,41 +324,40 @@ def _project(w: np.ndarray, sectors: np.ndarray, cap: float, scap: float) -> np.
 
 
 def build_portfolio(df: pd.DataFrame, prices: dict[str, pd.DataFrame], reg: dict | None) -> tuple[pd.DataFrame, dict]:
-    """Long-only mean-variance optimisation with a Ledoit-Wolf covariance, name/sector caps and a volatility target."""
+    """Highest scores first: take the top-ranked BUY/STRONG BUY names (max 5 per sector), size them by
+    score / volatility within name and sector caps, then scale exposure to a volatility target
+    (Ledoit-Wolf covariance) and the market regime."""
     from sklearn.covariance import LedoitWolf
-    cands = df[df["signal"].isin(["STRONG BUY", "BUY"])].sort_values("composite", ascending=False).head(45)
+    cands = df[df["signal"].isin(["STRONG BUY", "BUY"])].sort_values("composite", ascending=False)
     if len(cands) < 8:
-        cands = df[df["composite"].notna()].sort_values("composite", ascending=False).head(45)
-    syms = [s for s in cands["symbol"] if s in prices]
-    cands = cands.set_index("symbol").loc[syms].reset_index()
-    rets = pd.DataFrame({s: prices[s]["Close"].pct_change() for s in syms}).tail(252).dropna(axis=1, thresh=200).fillna(0)
-    cands = cands[cands["symbol"].isin(rets.columns)].reset_index(drop=True)
-    rets = rets[cands["symbol"]]
+        cands = df[df["composite"].notna()].sort_values("composite", ascending=False)
+    picks, per_sec = [], {}
+    for _, r in cands.iterrows():
+        if r["symbol"] not in prices or per_sec.get(r["sector"], 0) >= 5:
+            continue
+        picks.append(r)
+        per_sec[r["sector"]] = per_sec.get(r["sector"], 0) + 1
+        if len(picks) >= MAX_NAMES:
+            break
+    p = pd.DataFrame(picks).reset_index(drop=True)
+    rets = pd.DataFrame({s: prices[s]["Close"].pct_change() for s in p["symbol"]}).tail(252).fillna(0)
+    vol = rets.std().values * np.sqrt(252)
+    raw = (p["composite"].values / 100) / np.clip(vol, 0.08, None)
+    sec = p["sector"].values
+    wk = _project(raw / raw.sum(), sec, MAX_WEIGHT * 1.25, MAX_SECTOR_WEIGHT)
     cov = LedoitWolf().fit(rets.values).covariance_ * 252
-    if "exp_excess" in cands and cands["exp_excess"].notna().any():
-        mu = cands["exp_excess"].fillna(0).values * 12 + 0.04 * (cands["composite"].values / 100 - 0.5)
-    else:
-        mu = 0.08 * (cands["composite"].values / 100 - 0.5)
-    sec = cands["sector"].values
-    w = _project(np.ones(len(cands)) / len(cands), sec, MAX_WEIGHT, MAX_SECTOR_WEIGHT)
-    step = 0.5 / (RISK_AVERSION * np.linalg.eigvalsh(cov).max())
-    for _ in range(400):                                       # projected gradient ascent on mu'w - (lambda/2) w'Sw
-        w = _project(w + step * (mu - RISK_AVERSION * cov @ w), sec, MAX_WEIGHT, MAX_SECTOR_WEIGHT)
-    keep = np.argsort(-w)[:MAX_NAMES]
-    keep = keep[w[keep] > 0.005]
-    p = cands.iloc[keep].copy()
-    wk = _project(w[keep], sec[keep], MAX_WEIGHT * 1.25, MAX_SECTOR_WEIGHT)
-    sub = cov[np.ix_(keep, keep)]
-    vol = float(np.sqrt(wk @ sub @ wk))
-    exposure = min(INVESTED, (reg or {}).get("exposure", 1.0) * INVESTED, VOL_TARGET / vol if vol > 0 else INVESTED)
+    pvol = float(np.sqrt(wk @ cov @ wk))
+    exposure = min(INVESTED, (reg or {}).get("exposure", 1.0) * INVESTED, VOL_TARGET / pvol if pvol > 0 else INVESTED)
     p["weight"] = wk * exposure
     p["value"] = p["weight"] * PORTFOLIO_CAPITAL
     p["shares"] = np.floor(p["value"] / p["price"])
     beta = float(np.nansum(p["weight"] * p["beta_realized"].fillna(1.0)))
-    stats = {"ex_ante_vol": vol * exposure, "unlevered_vol": vol, "beta": beta, "invested": float(p["weight"].sum()),
-             "effective_n": float(1 / np.sum(wk ** 2)), "expected_excess_1m": float(np.sum(wk * cands.iloc[keep]["exp_excess"].fillna(0).values)) if "exp_excess" in cands else None,
-             "method": f"Mean-variance (risk aversion {RISK_AVERSION:g}), Ledoit-Wolf covariance, max {MAX_WEIGHT:.0%}/name, "
-                       f"{MAX_SECTOR_WEIGHT:.0%}/sector, {VOL_TARGET:.0%} volatility target, regime-scaled exposure"}
+    ee = p["exp_excess"].fillna(0).values if "exp_excess" in p else np.zeros(len(p))
+    stats = {"ex_ante_vol": pvol * exposure, "unlevered_vol": pvol, "beta": beta, "invested": float(p["weight"].sum()),
+             "effective_n": float(1 / np.sum(wk ** 2)), "expected_excess_1m": float(np.sum(wk * ee)),
+             "method": f"Top {MAX_NAMES} BUY/STRONG BUY stocks by score (max 5 per sector), weighted by score / volatility, "
+                       f"capped at {MAX_WEIGHT * 1.25:.0%} per name and {MAX_SECTOR_WEIGHT:.0%} per sector; total exposure scaled "
+                       f"to a {VOL_TARGET:.0%} volatility target (Ledoit-Wolf covariance) and the market regime"}
     return p.sort_values("weight", ascending=False), stats
 
 
