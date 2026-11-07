@@ -865,19 +865,11 @@ function ModelView({ report }: { report: Report | null }) {
     <main className="vx-model">
       <div className="vx-mhead">
         <h1 className="vx-h1">Model</h1>
-        <span className="vx-muted sm">Trained on {ml.samples.toLocaleString()} stock-months · predictions as of {ml.prediction_date}</span>
+        <span className="vx-muted sm">
+          Market regime <b className={reg.state === "RISK-ON" ? "up" : reg.state === "RISK-OFF" ? "dn" : "vx-acc"}>{reg.state.replace("-", " ").toLowerCase()}</b>
+          {" "}(SPY {pct(reg.spy_vs_200d, 1)} vs 200-day, exposure {pct(reg.exposure, 0, false)}) · trained on {ml.samples.toLocaleString()} stock-months · predictions as of {ml.prediction_date}
+        </span>
       </div>
-      <section className={cls("vx-card vx-verdict", `ev-${v.evidence}`)}>
-        <div>
-          <span className="vx-ev">Evidence: {v.evidence}</span>
-          <p>{EVIDENCE_TEXT[v.evidence]}</p>
-        </div>
-        <div className="vx-regime">
-          <span>Market regime</span>
-          <b className={reg.state === "RISK-ON" ? "up" : reg.state === "RISK-OFF" ? "dn" : "vx-acc"}>{reg.state.replace("-", " ").toLowerCase()}</b>
-          <small>SPY {pct(reg.spy_vs_200d, 1)} vs 200-day · vol {pct(reg.vol_20d, 0, false)} · target exposure {pct(reg.exposure, 0, false)}</small>
-        </div>
-      </section>
       <div className="vx-kpis">
         {kpis.map(([k, val, sub]) => <section key={k} className="vx-card vx-kpi"><span>{k}</span><b>{val}</b>{sub && <small>{sub}</small>}</section>)}
       </div>
