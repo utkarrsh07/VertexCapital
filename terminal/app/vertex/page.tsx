@@ -881,6 +881,8 @@ function ModelView({ report }: { report: Report | null }) {
       <div className="vx-kpis">
         {kpis.map(([k, val, sub]) => <section key={k} className="vx-card vx-kpi"><span>{k}</span><b>{val}</b>{sub && <small>{sub}</small>}</section>)}
       </div>
+      <BenchmarkChart ml={ml} />
+      <AnnualReturns ml={ml} />
       <div className="vx-mgrid2">
         <section className="vx-card vx-pad">
           <h3>Out-of-sample growth of $1</h3>
