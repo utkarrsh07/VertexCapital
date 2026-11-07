@@ -274,7 +274,7 @@ def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series, others: dict[str, pd.Serie
         "ic_t": t_stat, "evidence": strength,
         "quintiles": [{"q": int(q), "ann": float((1 + qret[q].mean()) ** (252 / HORIZON) - 1)} for q in qret.columns],
         "long_short_ann": float((1 + (qret[5] - qret[1]).mean()) ** (252 / HORIZON) - 1),
-        "top_net": stats(top_net), "universe": stats(ew), "spy": stats(spy),
+        "top_net": stats(top_net), "top_gross_unbuffered": stats(top_simple), "universe": stats(ew), "spy": stats(spy),
         "excess_t": ex_t, "avg_turnover": float(np.mean(cost) / (2 * COST_BPS / 1e4)) if cost else None,
         "calibration": calib,
         "curve": [[str(pd.Timestamp(d).date()), round(float(a), 4), round(float(b), 4), round(float(c), 4)]
