@@ -38,6 +38,7 @@ type MLReport = {
     quintiles: { q: number; ann: number }[]; long_short_ann: number; top_net: PerfStats; universe: PerfStats; spy: PerfStats;
     excess_t: number; avg_turnover: number | null; calibration: { quintile: number; mean_excess: number; hit_rate: number; n: number }[];
     curve: [string, number, number, number][]; rolling_ic: [string, number][]; ic_series: [string, number][];
+    benchmarks?: { name: string; stats: PerfStats; curve: [string, number][] }[];
     first_oos: string | null; last_oos: string | null; oos_months: number;
   };
 };
