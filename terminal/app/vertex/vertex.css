@@ -766,7 +766,7 @@
 .th-carbon .vx-plan-card h3 { text-align: left; font-size: 15px; font-stretch: 118%; font-weight: 750; }
 .th-carbon .vx-setup::after { display: none; }
 .th-carbon .vx-setup-h b { font-size: 15px; font-stretch: 118%; font-weight: 750; }
-.th-carbon .vx-setup-k b { font-size: 17px; font-weight: 750; letter-spacing: -0.01em; }
+.th-carbon .vx-setup-k b { font-size: 15px; font-weight: 750; letter-spacing: -0.02em; }
 .th-carbon .vx-badge2 { background: var(--raise); border-radius: 3px; color: var(--mut); }
 .th-carbon .vx-badge2.live { background: transparent; color: var(--up); border: 1px solid var(--line2); }
 .th-carbon .vx-setup-bar { height: 6px; }
