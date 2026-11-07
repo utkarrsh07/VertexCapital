@@ -213,14 +213,24 @@ def evaluate(oos: pd.DataFrame, bench_fwd: pd.Series, others: dict[str, pd.Serie
     oos["q"] = by["p_ens"].transform(lambda s: pd.qcut(s.rank(method="first"), 5, labels=False) + 1)
     qret = oos.groupby(["date", "q"])["fwd"].mean().unstack()
     ew = by["fwd"].mean()
-    # top-quintile portfolio with turnover costs
-    members = oos[oos["q"] == 5].groupby("date")["symbol"].apply(set)
-    prev, cost = None, []
-    for d, mem in members.items():
+    # strategy: top quintile with a turnover buffer (hold names while they stay in the top 40%,
+    # refill from the top quintile) - a standard rule to avoid paying costs for small rank changes
+    prev, cost, rets, idx = None, [], [], []
+    for d, g in oos.groupby("date"):
+        target = int((g["q"] == 5).sum())
+        if prev is None:
+            mem = set(g.loc[g["q"] == 5, "symbol"])
+        else:
+            keep = set(g.loc[(g["q"] >= 4) & g["symbol"].isin(prev), "symbol"])
+            fill = [s_ for s_ in g.sort_values("p_ens", ascending=False)["symbol"] if s_ not in keep]
+            mem = keep | set(fill[: max(0, target - len(keep))])
         turn = 1.0 if prev is None else 1 - len(mem & prev) / max(len(mem), 1)
         cost.append(2 * turn * COST_BPS / 1e4)    # sell + buy
+        rets.append(g.loc[g["symbol"].isin(mem), "fwd"].mean())
+        idx.append(d)
         prev = mem
-    top_net = qret[5] - pd.Series(cost, index=members.index)
+    top_net = pd.Series(rets, index=idx) - pd.Series(cost, index=idx)
+    top_simple = qret[5]
     spy = bench_fwd.reindex(qret.index)
 
     def stats(r: pd.Series) -> dict:
