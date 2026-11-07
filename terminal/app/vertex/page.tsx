@@ -861,7 +861,6 @@ function ModelView({ report }: { report: Report | null }) {
   ];
   const maxImp = Math.max(...ml.importance.map((i) => Math.abs(i.ridge)), 1e-9);
   const maxG = Math.max(...ml.importance.map((i) => Math.max(i.gbm, 0)), 1e-9);
-  const maxQ = Math.max(...v.quintiles.map((q) => Math.abs(q.ann)), 1e-9);
   return (
     <main className="vx-model">
       <div className="vx-mhead">
@@ -877,28 +876,7 @@ function ModelView({ report }: { report: Report | null }) {
       <BenchmarkChart ml={ml} />
       <AnnualReturns ml={ml} />
       <div className="vx-mgrid2">
-        <section className="vx-card vx-pad">
-          <h3>Out-of-sample growth of $1</h3>
-          <LineChart height={250} fmt={(x) => x.toFixed(2)} zero={1}
-            series={[
-              { name: "Top quintile (net)", color: "var(--acc)", pts: v.curve.map((c) => [c[0], c[1]]) },
-              { name: "Equal-weight universe", color: "var(--txt)", pts: v.curve.map((c) => [c[0], c[2]]), dash: true },
-              { name: "SPY", color: "var(--mut)", pts: v.curve.map((c) => [c[0], c[3]]), dash: true },
-            ]} />
-        </section>
-        <section className="vx-card vx-pad">
-          <h3>Annualised return by model quintile</h3>
-          <div className="vx-qbars">
-            {v.quintiles.map((q) => (
-              <div key={q.q} className="vx-qcol">
-                <div className="vx-qwrap"><div className={cls("vx-qbar", q.ann < 0 && "neg", q.q === 5 && "top")} style={{ height: `${(Math.abs(q.ann) / maxQ) * 100}%` }} /></div>
-                <b className={q.ann >= 0 ? "up" : "dn"}>{pct(q.ann, 1)}</b>
-                <span>{q.q === 1 ? "Q1 lowest" : q.q === 5 ? "Q5 highest" : `Q${q.q}`}</span>
-              </div>
-            ))}
-          </div>
-          <div className="vx-foot">Long Q5 / short Q1 spread: {pct(v.long_short_ann, 1)} a year (gross). A rising staircase means the ranking sorts winners from losers.</div>
-        </section>
+
         <section className="vx-card vx-pad">
           <h3>Information coefficient by month</h3>
           <LineChart height={210} fmt={(x) => x.toFixed(2)} zero={0}
