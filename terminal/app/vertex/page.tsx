@@ -658,8 +658,36 @@ function LineChart({ series, height = 220, fmt, zero, log = false }: {
         {series.map((s) => s.bars
           ? s.pts.map((p, i) => <rect key={i} x={X(i) - Math.max(1, cw / n * 0.35)} width={Math.max(2, cw / n * 0.7)} y={Math.min(Y(p[1]), Y(zero ?? 0))}
               height={Math.abs(Y(p[1]) - Y(zero ?? 0))} fill={p[1] >= (zero ?? 0) ? "var(--up)" : "var(--dn)"} opacity={0.45} />)
-          : <path key={s.name} d={s.pts.map((p, i) => !isFinite(p[1]) ? "" : `${i && isFinite(s.pts[i - 1][1]) ? "L" : "M"}${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("")} fill="none"
-              stroke={s.color} strokeWidth={s.dash ? 1.2 : 1.8} strokeDasharray={s.dash ? "4 3" : undefined} className="vx-draw" pathLength={1} />)}
+          : (() => {
+              const d = s.pts.map((p, i) => !isFinite(p[1]) ? "" : `${i && isFinite(s.pts[i - 1][1]) ? "L" : "M"}${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+              const base = Y(zero ?? (log ? Math.exp(lo - pad) : lo - pad));
+              const last = s.pts.length - 1;
+              return (
+                <g key={s.name} className={cls(s.dim && "vx-dimline", s.glow && "vx-hero")}>
+                  {s.area && last > 0 && (
+                    <>
+                      <defs>
+                        <linearGradient id="vx-hero-fill" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0" stopColor="#e8a33d" stopOpacity="0.32" /><stop offset="1" stopColor="#e8a33d" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path d={`${d}L${X(last).toFixed(1)},${base.toFixed(1)}L${X(0).toFixed(1)},${base.toFixed(1)}Z`} fill="url(#vx-hero-fill)" className="vx-hero-area" />
+                    </>
+                  )}
+                  {s.glow && <path d={d} fill="none" stroke={s.color} strokeWidth={14} className="vx-glow2" />}
+                  {s.glow && <path d={d} fill="none" stroke={s.color} strokeWidth={7} className="vx-glow" />}
+                  <path d={d} fill="none" stroke={s.color} strokeWidth={s.glow ? 3 : s.dash ? 1.2 : 1.3}
+                    strokeDasharray={s.dash ? "4 3" : undefined} className="vx-draw" pathLength={1} />
+                  {s.glow && last >= 0 && (
+                    <>
+                      <circle cx={X(last)} cy={Y(s.pts[last][1])} r={5} fill={s.color} className="vx-glow-dot" />
+                      <circle cx={X(last)} cy={Y(s.pts[last][1])} r={5} fill="none" stroke={s.color} className="vx-pulse-ring" />
+                      <text x={X(last) - 8} y={Y(s.pts[last][1]) - 12} textAnchor="end" className="vx-hero-tag">VertexCapital ${fx(s.pts[last][1], 2)}</text>
+                    </>
+                  )}
+                </g>
+              );
+            })())}
         {hi != null && <line x1={X(hi)} x2={X(hi)} y1={T} y2={T + ch} className="vx-cross" />}
       </svg>
       <div className="vx-lc-leg">
