@@ -542,7 +542,7 @@ def run(root: Path, limit: int | None, workers: int) -> int:
             "stats": {k: clean(v) if not isinstance(v, str) else v for k, v in pstats.items()} if len(port) else {},
             "holdings": [{"symbol": r["symbol"], "name": r["name"], "sector": r["sector"],
                           "weight": clean(r["weight"]), "value": clean(r["value"], 2), "shares": int(r["shares"]),
-                          "price": clean(r["price"]), "score": clean(r["score"], 2)} for _, r in port.iterrows()],
+                          "price": clean(r["price"]), "score": clean(r["composite"], 2)} for _, r in port.iterrows()],
             "trailing": [{k: clean(v) if k != "period" else v for k, v in t.items()} for t in trail],
             "trailing_note": "Trailing returns of TODAY's selection held over past windows (hindsight; not a backtest).",
         },
