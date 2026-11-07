@@ -92,7 +92,8 @@ def download_prices(symbols: list[str], chunk: int = 80) -> dict[str, pd.DataFra
     for bi, batch in enumerate(batches, 1):
         t = time.time()
         try:
-            raw = yf.download(batch, period=PRICE_PERIOD, interval="1d", auto_adjust=True,
+            start = (pd.Timestamp.today() - pd.DateOffset(years=PRICE_YEARS)).strftime("%Y-%m-%d")
+            raw = yf.download(batch, start=start, interval="1d", auto_adjust=True,
                               group_by="ticker", threads=True, progress=False)
         except Exception as exc:  # network / Yahoo hiccup
             log("PRICES", f"batch {bi}/{len(batches)} failed: {exc}")
