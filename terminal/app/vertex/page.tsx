@@ -1623,34 +1623,28 @@ export default function VertexPage() {
           <div className="vx-d">
           {stock && <SetupBar stock={stock} price={px(stock)} live={!!q(stock.symbol)} date={report?.price_date}
             intraday={feed?.intraday?.symbol === stock.symbol ? feed.intraday.points : null} />}
-          <section className="vx-card vx-plan-card">
-            <h3>Position Planner</h3>
-            <div className="vx-opts">
-              <div className="on"><span className="vx-dot ok" />Long only</div>
-              <div><span className={cls("vx-sig", sigCls(stock?.signal || "N/A"))}>{stock?.signal || "—"}</span>Signal</div>
-            </div>
-            <label className="vx-lbl">Account size (USD, hypothetical)</label>
-            <div className="vx-input">
-              <input type="number" value={account} min={1000} step={1000} onChange={(e) => setAccount(Math.max(0, Number(e.target.value)))} />
-              <span className="vx-muted">≈ {plan ? `${plan.shares} sh` : "—"}</span>
-            </div>
-            <label className="vx-lbl">Risk per trade <b className="vx-acc">{risk.toFixed(2)}%</b></label>
-            <input className="vx-range" type="range" min={0.25} max={3} step={0.25} value={risk} onChange={(e) => setRisk(Number(e.target.value))}
-              style={{ ["--p" as string]: `${((risk - 0.25) / 2.75) * 100}%` }} />
-            {stock && plan && (
-              <div className="vx-plan">
-                <div><span>Entry</span><b className="c-entry">{fx(stock.entry)}</b></div>
-                <div><span>Stop</span><b className="dn">{fx(stock.stop)}</b></div>
-                <div><span>Target</span><b className="up">{fx(stock.target)}</b></div>
-                <div><span>Position</span><b>{money(plan.position)}</b></div>
-                <div><span>Max loss</span><b className="dn">-{money(plan.maxLoss)}</b></div>
-                <div><span>At target</span><b className="up">+{money(plan.gain)}</b></div>
+          <section className="vx-card vx-plan-card vx-mix">
+            <h3>Signal mix</h3>
+            <div className="vx-muted sm">{scored.length} stocks · {universe === "All" ? "S&P 500 + TSX 60" : universe}</div>
+            {["STRONG BUY", "BUY", "HOLD", "REDUCE", "SELL"].map((t) => {
+              const n = scored.filter((x) => x.signal === t).length;
+              return (
+                <button key={t} className={cls("vx-mixr", (t === "STRONG BUY" || t === "BUY" ? "BUY" : t === "HOLD" ? "HOLD" : "SELL") === sigFilter && "on")}
+                  onClick={() => { setSigFilter(t === "STRONG BUY" || t === "BUY" ? "BUY" : t === "HOLD" ? "HOLD" : "SELL"); setBottomTab("levels"); }}>
+                  <span className={cls("vx-sig", sigCls(t))}>{SIG_SHORT[t]}</span>
+                  <span className="vx-mixb"><i className={sigCls(t)} style={{ width: `${scored.length ? (n / scored.length) * 100 : 0}%` }} /></span>
+                  <b>{n}</b>
+                </button>
+              );
+            })}
+            {report?.regime && (
+              <div className="vx-mixreg">
+                <span>Market regime</span>
+                <b className={report.regime.state === "RISK-ON" ? "up" : report.regime.state === "RISK-OFF" ? "dn" : "vx-acc"}>{report.regime.state.replace("-", " ").toLowerCase()}</b>
               </div>
             )}
-            {plan?.capped && <div className="vx-note">Position capped at 25% of account.</div>}
             <div className="vx-actions">
-              <button onClick={runScan} disabled={scanning}>{scanning ? "SCANNING…" : "RUN SCAN"}</button>
-              <button onClick={exportCsv} disabled={!table.length}>EXPORT CSV</button>
+              <button onClick={exportCsv} disabled={!table.length}>Export CSV</button>
             </div>
           </section>
           </div>
