@@ -627,19 +627,21 @@ function MarketView({ report, onOpen, clock }: { report: Report | null; onOpen: 
 }
 
 /* ============================================================ shared line chart */
-function LineChart({ series, height = 220, fmt, zero }: {
-  series: { name: string; color: string; pts: [string, number][]; dash?: boolean; bars?: boolean }[];
-  height?: number; fmt: (v: number) => string; zero?: number;
+function LineChart({ series, height = 220, fmt, zero, log = false }: {
+  series: { name: string; color: string; pts: [string, number][]; dash?: boolean; bars?: boolean; glow?: boolean; area?: boolean; dim?: boolean }[];
+  height?: number; fmt: (v: number) => string; zero?: number; log?: boolean;
 }) {
+  const tf = (v: number) => (log ? Math.log(Math.max(v, 1e-9)) : v);
+  const inv = (v: number) => (log ? Math.exp(v) : v);
   const [ref, { w }] = useSize<HTMLDivElement>();
   const [hi, setHi] = useState<number | null>(null);
-  const all = series.flatMap((s) => s.pts.map((p) => p[1])).filter((v) => isFinite(v)).concat(zero != null ? [zero] : []);
+  const all = series.flatMap((s) => s.pts.map((p) => tf(p[1]))).filter((v) => isFinite(v)).concat(zero != null ? [tf(zero)] : []);
   const n = Math.max(...series.map((s) => s.pts.length), 0);
   if (!n || w < 50) return <div ref={ref} style={{ height }} className="vx-empty sm">No data</div>;
   const lo = Math.min(...all), hiV = Math.max(...all), pad = (hiV - lo) * 0.08 || 1;
   const L = 8, R = 56, T = 8, B = 20, cw = w - L - R, ch = height - T - B;
   const X = (i: number) => L + (n === 1 ? cw / 2 : (i / (n - 1)) * cw);
-  const Y = (v: number) => T + ((hiV + pad - v) / (hiV - lo + 2 * pad)) * ch;
+  const Y = (raw: number) => { const v = tf(raw); return T + ((hiV + pad - v) / (hiV - lo + 2 * pad)) * ch; };
   const ticks = Array.from({ length: 5 }, (_, i) => lo - pad + ((hiV - lo + 2 * pad) * i) / 4);
   const dates = series[0].pts.map((p) => p[0]);
   return (
@@ -647,7 +649,7 @@ function LineChart({ series, height = 220, fmt, zero }: {
       onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left - L) / cw) * (n - 1)); setHi(i >= 0 && i < n ? i : null); }}
       onMouseLeave={() => setHi(null)}>
       <svg width={w} height={height}>
-        {ticks.map((t, i) => <g key={i}><line x1={L} x2={L + cw} y1={Y(t)} y2={Y(t)} className="vx-grid" /><text x={L + cw + 6} y={Y(t) + 3} className="vx-axis">{fmt(t)}</text></g>)}
+        {ticks.map((t, i) => <g key={i}><line x1={L} x2={L + cw} y1={Y(inv(t))} y2={Y(inv(t))} className="vx-grid" /><text x={L + cw + 6} y={Y(inv(t)) + 3} className="vx-axis">{fmt(inv(t))}</text></g>)}
         {zero != null && <line x1={L} x2={L + cw} y1={Y(zero)} y2={Y(zero)} stroke="var(--mut)" strokeDasharray="3 3" opacity={0.6} />}
         {dates.filter((_, i) => i % Math.max(1, Math.ceil(n / 6)) === 0).map((d) => {
           const i = dates.indexOf(d);
