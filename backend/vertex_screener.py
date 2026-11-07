@@ -397,7 +397,7 @@ def run(root: Path, limit: int | None, workers: int) -> int:
                     + ", ".join(f"{lbl} {w:.0%}" for _, lbl, w, _, _ in FACTORS))
 
     symbols = uni["symbol"].tolist()
-    prices = download_prices(symbols + [BENCHMARK])
+    prices = download_prices(symbols + [b for b in BENCH_ETFS if b not in symbols])
     if BENCHMARK not in prices:
         log("ERROR", "benchmark SPY unavailable - check internet connection")
         return 2
