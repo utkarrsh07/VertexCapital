@@ -850,13 +850,14 @@ function ModelView({ report }: { report: Report | null }) {
     );
   }
   const v = ml.validation, e = v.ic.ens, reg = ml.regime;
-  const kpis: [string, string, string?][] = [
-    ["Out-of-sample months", String(v.oos_months), `${v.first_oos} to ${v.last_oos}`],
-    ["Rank IC (ensemble)", `${e.mean >= 0 ? "+" : ""}${e.mean.toFixed(3)}`, `t-stat ${v.ic_t.toFixed(2)} · positive ${pct(e.hit, 0, false)} of months`],
-    ["Top quintile CAGR, net", pct(v.top_net?.cagr, 1), `after ${ml.cost_bps} bps per trade`],
-    ["Equal-weight universe", pct(v.universe?.cagr, 1), `SPY ${pct(v.spy?.cagr, 1)}`],
-    ["Top quintile Sharpe", fx(v.top_net?.sharpe, 2), `universe ${fx(v.universe?.sharpe, 2)}`],
-    ["Top quintile max drawdown", pct(v.top_net?.max_dd, 1), `monthly hit rate ${pct(v.top_net?.hit, 0, false)}`],
+  const sgn = (x?: number | null) => ((x ?? 0) >= 0 ? "up" : "dn");
+  const kpis: [string, string, string, string?][] = [
+    ["Out-of-sample months", String(v.oos_months), "vx-acc", `${v.first_oos} to ${v.last_oos}`],
+    ["Rank IC (ensemble)", `${e.mean >= 0 ? "+" : ""}${e.mean.toFixed(3)}`, sgn(e.mean), `t-stat ${v.ic_t.toFixed(2)} · positive ${pct(e.hit, 0, false)} of months`],
+    ["VertexCapital CAGR, net", pct(v.top_net?.cagr, 1), sgn(v.top_net?.cagr), `after ${ml.cost_bps} bps per trade`],
+    ["Equal-weight universe", pct(v.universe?.cagr, 1), "vx-kpi-mut", `SPY ${pct(v.spy?.cagr, 1)}`],
+    ["VertexCapital Sharpe", fx(v.top_net?.sharpe, 2), "vx-acc", `universe ${fx(v.universe?.sharpe, 2)}`],
+    ["VertexCapital max drawdown", pct(v.top_net?.max_dd, 1), "dn", `monthly hit rate ${pct(v.top_net?.hit, 0, false)}`],
   ];
   const maxImp = Math.max(...ml.importance.map((i) => Math.abs(i.ridge)), 1e-9);
   const maxG = Math.max(...ml.importance.map((i) => Math.max(i.gbm, 0)), 1e-9);
@@ -871,7 +872,7 @@ function ModelView({ report }: { report: Report | null }) {
         </span>
       </div>
       <div className="vx-kpis">
-        {kpis.map(([k, val, sub]) => <section key={k} className="vx-card vx-kpi"><span>{k}</span><b>{val}</b>{sub && <small>{sub}</small>}</section>)}
+        {kpis.map(([k, val, c, sub]) => <section key={k} className={cls("vx-card vx-kpi", c)}><span>{k}</span><b className={c}>{val}</b>{sub && <small>{sub}</small>}</section>)}
       </div>
       <BenchmarkChart ml={ml} />
       <AnnualReturns ml={ml} />
