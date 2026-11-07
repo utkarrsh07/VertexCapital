@@ -564,6 +564,11 @@
 .vx-dimline { opacity: 0.55; transition: opacity 0.2s; }
 .vx-lc:hover .vx-dimline { opacity: 0.85; }
 .th-carbon .vx-ixch .vx-hero .vx-pulse-ring, .vx-hero .vx-pulse-ring { display: inline; stroke: #f5b54a; }
+.vx-kpi b.up { color: var(--up); } .vx-kpi b.dn { color: var(--dn); } .vx-kpi b.vx-acc { color: var(--acc); }
+.vx-kpi.up { border-top: 2px solid var(--up) !important; } .vx-kpi.dn { border-top: 2px solid var(--dn) !important; }
+.vx-kpi.vx-acc { border-top: 2px solid var(--acc) !important; } .vx-kpi.vx-kpi-mut { border-top: 2px solid var(--line2) !important; }
+.vx-mhead .vx-muted b { font-weight: 700; text-transform: capitalize; }
+
 /* calendar-year returns */
 .vx-annual { margin-bottom: 12px; }
 .vx-ybars { display: flex; gap: 6px; height: 230px; padding: 6px 4px 0; }
