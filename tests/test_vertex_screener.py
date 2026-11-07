@@ -72,6 +72,7 @@ def test_portfolio_respects_caps():
     assert port.groupby("sector")["weight"].sum().max() / port["weight"].sum() <= vs.MAX_SECTOR_WEIGHT + 1e-6
     assert port["weight"].sum() <= vs.INVESTED + 1e-6
     assert stats["ex_ante_vol"] <= vs.VOL_TARGET + 1e-6
+    assert "S0" in set(port["symbol"])          # highest score is always held
 
 
 def test_ml_walk_forward_finds_planted_signal_and_not_noise():
