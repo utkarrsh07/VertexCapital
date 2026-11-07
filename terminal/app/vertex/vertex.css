@@ -564,6 +564,26 @@
 .vx-dimline { opacity: 0.55; transition: opacity 0.2s; }
 .vx-lc:hover .vx-dimline { opacity: 0.85; }
 .th-carbon .vx-ixch .vx-hero .vx-pulse-ring, .vx-hero .vx-pulse-ring { display: inline; stroke: #f5b54a; }
+/* calendar-year returns */
+.vx-annual { margin-bottom: 12px; }
+.vx-ybars { display: flex; gap: 6px; height: 230px; padding: 6px 4px 0; }
+.vx-ycol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.vx-yplot { position: relative; flex: 1; width: 100%; display: flex; justify-content: center; gap: 2px; }
+.vx-yzero { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line2); }
+.vx-yb { position: absolute; opacity: 0.55; animation: vxgrow 0.9s cubic-bezier(.2,.8,.2,1) both; }
+.vx-yb { transform-origin: bottom; } .vx-yb.neg { transform-origin: top; }
+.vx-yb.hero { opacity: 1; box-shadow: 0 0 14px rgba(245, 181, 74, 0.75); z-index: 1; }
+.vx-ycol b { font-size: 12px; }
+.vx-ycol span { font-size: 10.5px; color: var(--mut); }
+.vx-ytab-wrap { overflow-x: auto; margin-top: 12px; }
+.vx-ytab { width: 100%; border-collapse: separate; border-spacing: 2px; font-size: 11.5px; }
+.vx-ytab th { color: var(--mut); font-weight: 500; text-align: right; padding: 4px 6px; }
+.vx-ytab th:first-child, .vx-ytab td:first-child { text-align: left; white-space: nowrap; background: none !important; }
+.vx-ytab td { text-align: right; padding: 5px 6px; font-variant-numeric: tabular-nums; }
+.vx-ytab td:first-child .vx-sw { margin-right: 8px; }
+.vx-ytab tr.hero td { font-weight: 800; }
+.vx-ytab tr.hero td:first-child { color: #f5b54a; }
+
 
 /* portfolio builder */
 .vx-b-top { display: grid; grid-template-columns: 1.15fr 1fr 0.75fr; gap: 12px; align-items: start; }
