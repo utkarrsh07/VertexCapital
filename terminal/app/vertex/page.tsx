@@ -749,6 +749,89 @@ function BenchmarkChart({ ml }: { ml: MLReport }) {
   );
 }
 
+/* ============================================================ calendar-year returns */
+function yearly(pts: [string, number][]): Record<string, { r: number; partial: boolean }> {
+  const out: Record<string, { r: number; partial: boolean }> = {};
+  let base = 1, startMonth = pts.length ? Number(pts[0][0].slice(5, 7)) : 1;
+  const byYear = new Map<string, [string, number][]>();
+  pts.forEach((p) => { const y = p[0].slice(0, 4); byYear.set(y, [...(byYear.get(y) || []), p]); });
+  const years = [...byYear.keys()].sort();
+  years.forEach((y, i) => {
+    const g = byYear.get(y)!;
+    const end = g[g.length - 1][1];
+    const partial = (i === 0 && startMonth > 2) || (i === years.length - 1 && Number(g[g.length - 1][0].slice(5, 7)) < 11);
+    out[y] = { r: end / base - 1, partial };
+    base = end;
+    startMonth = 1;
+  });
+  return out;
+}
+
+function AnnualReturns({ ml }: { ml: MLReport }) {
+  const v = ml.validation;
+  const lines = [
+    { name: "VertexCapital", color: "#f5b54a", pts: v.curve.map((c) => [c[0], c[1]] as [string, number]), hero: true },
+    ...(v.benchmarks || []).map((b, i) => ({ name: b.name.replace(/ \(.*\)/, ""), color: BENCH_COLORS[i % BENCH_COLORS.length], pts: b.curve, hero: false })),
+    { name: "Equal-weight universe", color: "var(--txt)", pts: v.curve.map((c) => [c[0], c[2]] as [string, number]), hero: false },
+  ];
+  const ys = lines.map((l) => ({ ...l, y: yearly(l.pts) }));
+  const years = Object.keys(ys[0].y).sort();
+  const sp = ys.find((l) => l.name.startsWith("S&P 500"));
+  const barLines = ys.filter((l) => l.hero || l.name.startsWith("S&P 500") || l.name.startsWith("Nasdaq") || l.name.startsWith("Equal"));
+  const allR = barLines.flatMap((l) => years.map((y) => l.y[y]?.r ?? 0));
+  const mx = Math.max(0.05, ...allR.map(Math.abs));
+  const fullYears = years.filter((y) => !ys[0].y[y].partial);
+  const beatSp = sp ? fullYears.filter((y) => ys[0].y[y].r > (sp.y[y]?.r ?? 0)).length : 0;
+  const posYears = fullYears.filter((y) => ys[0].y[y].r > 0).length;
+  const cell = (r: number) => {
+    const k = Math.max(-1, Math.min(1, r / 0.3));
+    return k >= 0 ? `rgba(69, 192, 138, ${0.12 + 0.55 * k})` : `rgba(229, 83, 75, ${0.12 + 0.55 * -k})`;
+  };
+  return (
+    <section className="vx-card vx-pad vx-annual">
+      <div className="vx-chead">
+        <h3>Returns by calendar year</h3>
+        <span className="vx-muted sm">
+          VertexCapital was positive in <b className="up">{posYears} of {fullYears.length}</b> full years and beat the S&amp;P 500 in <b className="vx-acc">{beatSp} of {fullYears.length}</b>
+        </span>
+      </div>
+      <div className="vx-ybars">
+        {years.map((y) => (
+          <div key={y} className="vx-ycol">
+            <div className="vx-yplot">
+              <div className="vx-yzero" />
+              {barLines.map((l, i) => {
+                const r = l.y[y]?.r ?? 0, h = (Math.abs(r) / mx) * 50;
+                return (
+                  <div key={l.name} className={cls("vx-yb", l.hero && "hero", r < 0 && "neg")} title={`${l.name} ${y}: ${pct(r, 1)}`}
+                    style={{ height: `${h}%`, left: `${6 + i * (88 / barLines.length)}%`, width: `${(88 / barLines.length) - 4}%`, background: l.color, ...(r >= 0 ? { bottom: "50%" } : { top: "50%" }) }} />
+                );
+              })}
+            </div>
+            <b className={ys[0].y[y].r >= 0 ? "up" : "dn"}>{pct(ys[0].y[y].r, 0)}</b>
+            <span>{y}{ys[0].y[y].partial ? "*" : ""}</span>
+          </div>
+        ))}
+      </div>
+      <div className="vx-lc-leg">{barLines.map((l) => <span key={l.name}><i style={{ background: l.color }} />{l.name}</span>)}</div>
+      <div className="vx-ytab-wrap">
+        <table className="vx-ytab">
+          <thead><tr><th>Line</th>{years.map((y) => <th key={y}>{y}{ys[0].y[y].partial ? "*" : ""}</th>)}</tr></thead>
+          <tbody>
+            {ys.map((l) => (
+              <tr key={l.name} className={cls(l.hero && "hero")}>
+                <td><i className="vx-sw" style={{ background: l.color }} />{l.name}</td>
+                {years.map((y) => { const r = l.y[y]?.r; return <td key={y} style={{ background: r == null ? undefined : cell(r) }}>{r == null ? "—" : pct(r, 1)}</td>; })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="vx-foot vx-left">* partial year (the test window starts {v.first_oos} and ends {v.last_oos}). Out-of-sample, after costs; same survivorship caveat as above.</div>
+    </section>
+  );
+}
+
 /* ============================================================ model tab */
 const EVIDENCE_TEXT: Record<string, string> = {
   strong: "The ranking predicted next-month returns consistently out of sample, and the top quintile beat the universe after costs with statistical significance.",
