@@ -449,7 +449,8 @@ def run(root: Path, limit: int | None, workers: int) -> int:
     try:
         import vertex_ml
         res = vertex_ml.run_ml({s_: prices[s_] for s_ in usable + [BENCHMARK]},
-                               dict(zip(df["symbol"], df["sector"])), log=lambda m: log("ML", m))
+                               dict(zip(df["symbol"], df["sector"])), log=lambda m: log("ML", m),
+                               bench_closes={name: prices[sym]["Close"] for sym, name in BENCH_ETFS.items() if sym in prices})
         if res:
             sc = res["scores"]
             df["ml_pct"] = df["symbol"].map(sc["ml_pct"])

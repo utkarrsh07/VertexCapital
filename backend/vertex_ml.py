@@ -292,7 +292,8 @@ def regime(spy: pd.Series) -> dict:
     return {"state": state, "exposure": exposure, "spy_vs_200d": px / ma200 - 1, "vol_20d": vol20, "drawdown_52w": dd}
 
 
-def run_ml(prices: dict[str, pd.DataFrame], sectors: dict[str, str], log=print, bench: str = "SPY") -> dict | None:
+def run_ml(prices: dict[str, pd.DataFrame], sectors: dict[str, str], log=print, bench: str = "SPY",
+           bench_closes: dict[str, pd.Series] | None = None) -> dict | None:
     """Returns {'scores': DataFrame(symbol -> ml_pct, exp_excess, hit_prob, drivers), 'report': {...}}"""
     close, volume = build_panel(prices, bench)
     if len(close) < 252 + HORIZON * (MIN_TRAIN_DATES + 4):
@@ -308,7 +309,14 @@ def run_ml(prices: dict[str, pd.DataFrame], sectors: dict[str, str], log=print, 
         return None
     spy_c = close[bench]
     bench_fwd = (spy_c.shift(-HORIZON) / spy_c - 1)
-    ev = evaluate(oos, bench_fwd)
+    others = {}
+    for name, ser in (bench_closes or {}).items():
+        sc = ser.reindex(close.index).ffill(limit=5)
+        others[name] = sc.shift(-HORIZON) / sc - 1
+    ev = evaluate(oos, bench_fwd, others)
+    for b in ev["benchmarks"]:
+        log(f"benchmark {b['name']:<24} CAGR {b['stats'].get('cagr', 0):+.1%}  Sharpe {b['stats'].get('sharpe') or 0:.2f}  "
+            f"maxDD {b['stats'].get('max_dd', 0):.1%}")
     e = ev["ic"]["ens"]
     log(f"OOS {ev['oos_months']} months: rank IC {e['mean']:+.4f} (t={ev['ic_t']:.2f}, hit {e['hit']:.0%})  "
         f"ridge {ev['ic']['ridge']['mean']:+.4f}  gbm {ev['ic']['gbm']['mean']:+.4f}")
