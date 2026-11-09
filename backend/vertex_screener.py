@@ -51,7 +51,7 @@ PRICE_YEARS = 13        # 13 years: 1y feature warm-up + 2y initial training + ~
 # Benchmarks are ETFs (dividends reinvested, like the stock data) so the comparison is like-for-like.
 BENCH_ETFS = {"SPY": "S&P 500 (SPY)", "QQQ": "Nasdaq 100 (QQQ)", "DIA": "Dow Jones (DIA)",
               "IWM": "Russell 2000 (IWM)", "XIU.TO": "TSX 60 (XIU)", "ACWI": "MSCI World (ACWI)"}
-FUND_CACHE_VERSION = 2
+FUND_CACHE_VERSION = 3
 MIN_FACTORS = 6          # a stock needs at least 6 of 9 factors to be scored
 MIN_SECTOR_SIZE = 8      # smaller sectors are ranked against the whole universe
 CANDLE_DAYS = 160
