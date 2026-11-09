@@ -636,6 +636,29 @@
 .vx-pk-sc { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .vx-pk-sc b { color: var(--acc); font-size: 14px; font-weight: 800; }
 .vx-pk-sc i { display: block; height: 3px; background: var(--acc); max-width: 100%; align-self: flex-end; }
+.vx-pk-det { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; animation: vxfade 0.35s ease-out both; }
+.vx-pd-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.vx-pd-t { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vx-pd-t b { font-size: 30px; font-weight: 850; letter-spacing: -0.02em; line-height: 1.05; }
+.vx-pd-t .vx-sig { font-size: 13px; }
+.vx-pd-px { text-align: right; }
+.vx-pd-px b { font-size: 28px; font-weight: 800; }
+.vx-pd-px div { font-size: 12.5px; font-weight: 600; }
+.vx-pd-stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); }
+.vx-pd-stats div { padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.vx-pd-stats div + div { border-left: 1px solid var(--line); }
+.vx-pd-stats span { font-size: 10.5px; color: var(--mut); }
+.vx-pd-stats b { font-size: 20px; font-weight: 800; }
+.vx-pd-stats small { font-size: 10.5px; color: var(--mut); }
+.vx-pchart { position: relative; }
+.vx-pchart svg { display: block; }
+.vx-plv { font-size: 10.5px; font-weight: 700; }
+.vx-pd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.vx-pd-cols h4 { margin: 0 0 10px; font-size: 13px; font-weight: 750; display: flex; gap: 8px; align-items: baseline; }
+.vx-why2 { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vx-why2 li { font-size: 12.5px; line-height: 1.45; }
+.vx-why2 i { display: block; height: 3px; background: var(--line); margin-top: 5px; }
+.vx-why2 em { display: block; height: 100%; background: var(--acc); animation: vxwidth 0.8s ease-out both; }
 /* portfolio builder */
 .vx-b-top { display: grid; grid-template-columns: 1.15fr 1fr 0.75fr; gap: 12px; align-items: start; }
 .vx-quiz { display: grid; gap: 14px; }
