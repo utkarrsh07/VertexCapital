@@ -10,7 +10,7 @@ type Stock = {
   market_cap: number | null; price: number; change_1d: number | null; score: number | null;
   signal: string; factor_count: number; fund_score: number | null; ml_score: number | null;
   exp_excess_1m: number | null; hit_prob: number | null; ml_quintile: number | null; drivers: [string, number][];
-  vol_1y: number | null; dividend_yield: number | null;
+  vol_1y: number | null; dividend_yield: number | null; earnings_date?: string | null;
   value_score: number | null; growth_score: number | null; quality_score: number | null;
   factors: Record<string, FactorVal>; alpha: number | null; beta_realized: number | null;
   atr: number; atr_pct: number; sma20: number; sma50: number;
@@ -935,6 +935,24 @@ function ModelView({ report }: { report: Report | null }) {
       </div>
     </main>
   );
+}
+
+/* ============================================================ top picks */
+type NewsItem = { title: string; publisher: string; link: string; time: number; topics: string[]; tone: "positive" | "negative" | "neutral"; related?: boolean };
+
+function ago(t: number) {
+  const s = Date.now() / 1000 - t;
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
+
+function earningsChip(d?: string | null) {
+  if (!d) return null;
+  const days = Math.round((new Date(d + "T12:00:00").getTime() - Date.now()) / 86400000);
+  if (days >= 0 && days <= 60) return <span className={cls("vx-chip", days <= 7 && "hot")}>Earnings {days === 0 ? "today" : `in ${days} days`}</span>;
+  if (days < 0 && days >= -21) return <span className="vx-chip">Reported {-days} days ago</span>;
+  return null;
 }
 
 /* ============================================================ portfolio builder */
