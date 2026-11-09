@@ -11,8 +11,25 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 const TTL = 10 * 60_000;
 const cache = new Map<string, { at: number; items: Item[] }>();
 
-type Item = { title: string; publisher: string; link: string; time: number; topics: string[]; tone: "positive" | "negative" | "neutral" };
+type Item = { title: string; publisher: string; link: string; time: number; topics: string[]; tone: "positive" | "negative" | "neutral"; related: boolean };
 
+const GENERIC = new Set(["american", "general", "united", "first", "national", "western", "international", "global", "the", "bank",
+  "royal", "canadian", "southern", "northern", "public", "republic", "texas", "pacific", "atlantic", "new", "consolidated"]);
+/** Words that identify this company in a headline: ticker plus a cleaned company name. */
+function matchers(symbol: string, name: string): RegExp[] {
+  const base = symbol.replace(/\.TO$/, "").replace(/-[A-Z]$/, "");
+  const clean = name.replace(/\(.*?\)/g, "").replace(/\b(inc|corp|corporation|company|co|group|holdings?|plc|ltd|limited|the|class [ab]|n\.v\.|s\.a\.)\b\.?/gi, "")
+    .replace(/[^A-Za-z0-9&' -]/g, " ").replace(/\s+/g, " ").trim();
+  const words = clean.split(" ").filter(Boolean);
+  const out: RegExp[] = [];
+  if (base.length >= 2) out.push(new RegExp(`\\b${base}\\b`));
+  if (words.length) {
+    const first = words[0];
+    if (first.length >= 4 && !GENERIC.has(first.toLowerCase())) out.push(new RegExp(`\\b${first}`, "i"));
+    else if (words.length >= 2) out.push(new RegExp(`\\b${words[0]} ${words[1]}`, "i"));
+  }
+  return out;
+}
 
 const TOPICS: [string, RegExp][] = [
   ["Earnings", /\b(earnings|eps|quarterly|quarter|q[1-4]\b|results|revenue|profit|sales|beat|miss(es|ed)?)\b/i],
@@ -34,14 +51,17 @@ function tag(title: string): Pick<Item, "topics" | "tone"> {
   return { topics: topics.length ? topics : ["General"], tone: p && !n ? "positive" : n && !p ? "negative" : "neutral" };
 }
 
-async function fetchNews(symbol: string): Promise<Item[]> {
+async function fetchNews(symbol: string, name: string): Promise<Item[]> {
   const hit = cache.get(symbol);
+  // Yahoo search understands US tickers; for Toronto listings search by company name instead.
+  const query = symbol.endsWith(".TO") && name ? name.replace(/\(.*?\)/g, "").trim() : symbol;
+  const ms = matchers(symbol, name);
   if (hit && Date.now() - hit.at < TTL) return hit.items;
   for (const base of BASES) {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 7000);
-      const r = await fetch(`${base}/v1/finance/search?q=${encodeURIComponent(symbol)}&quotesCount=0&newsCount=8&enableFuzzyQuery=false`,
+      const r = await fetch(`${base}/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=0&newsCount=12&enableFuzzyQuery=false`,
         { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store", signal: ctrl.signal });
       clearTimeout(t);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -50,7 +70,8 @@ async function fetchNews(symbol: string): Promise<Item[]> {
       const items: Item[] = (j?.news || []).filter((n: any) => n?.title && n?.link).map((n: any) => ({
         title: String(n.title), publisher: String(n.publisher || ""), link: String(n.link),
         time: Number(n.providerPublishTime || 0), ...tag(String(n.title)),
-      })).sort((a: Item, b: Item) => b.time - a.time).slice(0, 6);
+        related: !ms.some((re) => re.test(String(n.title))),
+      })).sort((a: Item, b: Item) => (Number(a.related) - Number(b.related)) || b.time - a.time).slice(0, 6);
       cache.set(symbol, { at: Date.now(), items });
       return items;
     } catch { /* try next base */ }
@@ -59,12 +80,16 @@ async function fetchNews(symbol: string): Promise<Item[]> {
 }
 
 export async function GET(req: Request) {
-  const symbols = [...new Set((new URL(req.url).searchParams.get("symbols") || "").split(",")
-    .map((s) => s.trim().toUpperCase()).filter((s) => /^[A-Z0-9.^=-]{1,15}$/.test(s)))].slice(0, 20);
+  const sp = new URL(req.url).searchParams;
+  const rawSyms = (sp.get("symbols") || "").split(",").map((s) => s.trim().toUpperCase());
+  const rawNames = (sp.get("names") || "").split("|");
+  const names: Record<string, string> = {};
+  rawSyms.forEach((s, i) => { names[s] = (rawNames[i] || "").slice(0, 80); });
+  const symbols = [...new Set(rawSyms.filter((s) => /^[A-Z0-9.^=-]{1,15}$/.test(s)))].slice(0, 20);
   const out: Record<string, Item[]> = {};
   let k = 0;
   await Promise.all(Array.from({ length: Math.min(5, symbols.length) }, async () => {
-    while (k < symbols.length) { const s = symbols[k++]; out[s] = await fetchNews(s); }
+    while (k < symbols.length) { const s = symbols[k++]; out[s] = await fetchNews(s, names[s] || ""); }
   }));
   return Response.json({ asOf: Date.now(), news: out });
 }
