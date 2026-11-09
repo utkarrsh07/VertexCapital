@@ -1016,6 +1016,132 @@ function PickChart({ symbol, s, live }: { symbol: string; s: Stock; live: number
   );
 }
 
+function TopPicks({ report, px, chg, onOpen }: { report: Report | null; px: (s: Stock) => number; chg: (s: Stock) => number | null; onOpen: (s: string) => void }) {
+  const [mkt, setMkt] = useState<"All" | "S&P 500" | "TSX 60">("All");
+  const [news, setNews] = useState<Record<string, NewsItem[]>>({});
+  const [selSym, setSelSym] = useState<string | null>(null);
+  const ranked = useMemo(() => [...(report?.stocks || [])].filter((s) => s.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)), [report]);
+  const picks = useMemo(() => {
+    const out: Stock[] = [], perSec: Record<string, number> = {};
+    for (const s of ranked) {
+      if (!isBuy(s.signal) || (mkt !== "All" && s.index !== mkt) || (perSec[s.sector] || 0) >= 2) continue;
+      out.push(s); perSec[s.sector] = (perSec[s.sector] || 0) + 1;
+      if (out.length >= 10) break;
+    }
+    return out;
+  }, [ranked, mkt]);
+  const key = picks.map((p) => p.symbol).join(",");
+  useEffect(() => {
+    if (!key) return;
+    let dead = false;
+    const names = picks.map((p) => p.name.replace(/\|/g, " ")).join("|");
+    const load = () => fetch(`/api/vertex/news?symbols=${encodeURIComponent(key)}&names=${encodeURIComponent(names)}`).then((r) => r.json())
+      .then((j) => { if (!dead) setNews((n) => ({ ...n, ...j.news })); }).catch(() => {});
+    load();
+    const id = setInterval(load, 10 * 60_000);
+    return () => { dead = true; clearInterval(id); };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!report) return <main className="vx-picks"><h1 className="vx-h1">Today&apos;s top picks</h1><section className="vx-card vx-pad">Run a scan first.</section></main>;
+  const s = picks.find((p) => p.symbol === selSym) || picks[0];
+  const nItems = s ? news[s.symbol.toUpperCase()] : undefined;
+  const rankOf = (x: Stock) => ranked.indexOf(x) + 1;
+  const sectors = new Set(picks.map((p) => p.sector)).size;
+  const strong = picks.filter((p) => p.signal === "STRONG BUY").length;
+  return (
+    <main className="vx-picks">
+      <div className="vx-mhead">
+        <div>
+          <h1 className="vx-h1">Today&apos;s top picks</h1>
+          <p className="vx-sub2">
+            {picks.length} highest-rated stocks from the {report.price_date} scan · {strong} strong buys · {sectors} sectors · market regime{" "}
+            <b className={report.regime?.state === "RISK-ON" ? "up" : report.regime?.state === "RISK-OFF" ? "dn" : "vx-acc"}>{(report.regime?.state || "n/a").replace("-", " ").toLowerCase()}</b>
+          </p>
+        </div>
+        <div className="vx-mini">
+          {(["All", "S&P 500", "TSX 60"] as const).map((m) => <button key={m} className={cls(mkt === m && "on")} onClick={() => { setMkt(m); setSelSym(null); }}>{m}</button>)}
+        </div>
+      </div>
+
+      <div className="vx-pk">
+        <section className="vx-card vx-pk-list">
+          <div className="vx-pk-lh"><span>#</span><span>Stock</span><span>Price</span><span>6 months</span><span>Score</span></div>
+          {picks.map((p, i) => {
+            const c = chg(p), price = px(p);
+            const sp = [...(p.spark || []), price];
+            return (
+              <button key={p.symbol} className={cls("vx-pk-row", p.symbol === s?.symbol && "on")} onClick={() => setSelSym(p.symbol)}>
+                <span className="vx-pk-n">{i + 1}</span>
+                <span className="vx-pk-id"><b>{tick(p.symbol)}</b><small>{p.name}</small><em>{short(p.sector)} · <span className={cls("vx-sig", sigCls(p.signal))}>{SIG_SHORT[p.signal]}</span></em></span>
+                <span className="vx-pk-px"><Tween v={price} fmt={(x) => fx(x)} /><small className={(c ?? 0) >= 0 ? "up" : "dn"}>{pct(c)}</small></span>
+                <span className="vx-pk-sp"><Spark data={sp} w={96} h={30} fill={false} color={price >= (sp[0] ?? 0) ? "#45c08a" : "#e5534b"} /></span>
+                <span className="vx-pk-sc"><b>{fx(p.score, 1)}</b><i style={{ width: `${p.score ?? 0}%` }} /></span>
+              </button>
+            );
+          })}
+          {!picks.length && <div className="vx-empty sm">No Buy-rated stocks in this market.</div>}
+        </section>
+
+        {s && (
+          <section className="vx-card vx-pk-det" key={s.symbol}>
+            <div className="vx-pd-h">
+              <div>
+                <div className="vx-pd-t"><b>{tick(s.symbol)}</b><span className={cls("vx-sig", sigCls(s.signal))}>{SIG_SHORT[s.signal]}</span>{earningsChip(s.earnings_date)}</div>
+                <div className="vx-muted">{s.name} · {s.sector} · {s.index}</div>
+              </div>
+              <div className="vx-pd-px">
+                <b><Tween v={px(s)} fmt={(x) => fx(x)} /></b><span className="vx-muted"> {s.currency}</span>
+                <div className={(chg(s) ?? 0) >= 0 ? "up" : "dn"}>{pct(chg(s))} today</div>
+              </div>
+            </div>
+
+            <div className="vx-pd-stats">
+              <div><span>Score</span><b className="vx-acc">{fx(s.score, 1)}</b><small>rank {rankOf(s)} of {ranked.length}</small></div>
+              <div><span>Machine learning</span><b>{fx(s.ml_score, 0)}</b><small>{s.ml_quintile ? `quintile ${s.ml_quintile} of 5` : "—"}</small></div>
+              <div><span>Fundamentals</span><b>{fx(s.fund_score, 0)}</b><small>{s.factor_count} of 9 factors</small></div>
+              <div><span>Expected 1-month excess</span><b className={(s.exp_excess_1m ?? 0) >= 0 ? "up" : "dn"}>{pct(s.exp_excess_1m, 2)}</b><small>historical average</small></div>
+            </div>
+
+            <PickChart symbol={s.symbol} s={s} live={px(s)} />
+
+            <div className="vx-pd-cols">
+              <div>
+                <h4>Why the model likes it</h4>
+                <ul className="vx-why2">
+                  {reasons(s).map(([pc, t]) => (
+                    <li key={t}><span>{t}</span><i><em style={{ width: `${pc * 100}%` }} /></i></li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4>Latest news <span className="vx-muted sm">Yahoo Finance</span></h4>
+                {!nItems ? <div className="vx-news-empty">Loading headlines…</div> : !nItems.length ? <div className="vx-news-empty">No recent headlines.</div> : (
+                  <ul className="vx-news">
+                    {nItems.map((n) => (
+                      <li key={n.link} className={cls(n.related && "rel")}>
+                        <a href={n.link} target="_blank" rel="noopener noreferrer"><span className={cls("vx-tone", n.tone)} aria-label={`${n.tone} headline`} /><span className="vx-news-t">{n.title}</span></a>
+                        <div className="vx-news-m">
+                          {n.related && <span className="vx-rel">Industry</span>}
+                          {n.topics.map((t) => <span key={t} className="vx-topic">{t}</span>)}<span>{n.publisher}</span><span>{ago(n.time)}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="vx-pd-f">
+              <span className="vx-muted sm">Levels: entry {fx(s.entry)} · stop {fx(s.stop)} · target {fx(s.target)} (volatility-based, from the scan)</span>
+              <button className="vx-p2-open" onClick={() => onOpen(s.symbol)}>Open in Strategy Terminal</button>
+            </div>
+          </section>
+        )}
+      </div>
+      <div className="vx-disc">Ratings come from the VertexCapital model and are research, not advice. Headlines are from Yahoo Finance; topic and tone tags are keyword-based. &quot;Industry&quot; marks stories that don&apos;t name the company.</div>
+    </main>
+  );
+}
+
 /* ============================================================ portfolio builder */
 type Answers = { horizon: number; reaction: number; goal: number; tolerance: number; market: number; amount: number; count: number; fractional: boolean };
 const DEFAULT_ANSWERS: Answers = { horizon: 2, reaction: 1, goal: 1, tolerance: 1, market: 2, amount: 10000, count: 12, fractional: true };
