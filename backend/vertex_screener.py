@@ -157,6 +157,7 @@ def fetch_one_fundamental(symbol: str) -> dict:
                 "exchange": info.get("exchange"),
                 "eps_trailing": _num(info.get("trailingEps")),
                 "dividend_yield": _div_yield(info),
+                "earnings_ts": _num(info.get("earningsTimestampStart")) or _num(info.get("earningsTimestamp")),
                 "v": FUND_CACHE_VERSION,
                 "fetched": time.time(),
             }
