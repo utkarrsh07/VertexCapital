@@ -429,6 +429,7 @@ def run(root: Path, limit: int | None, workers: int) -> int:
             "change_1d": float(c.iloc[-1] / c.iloc[-2] - 1),
             "vol_1y": float(c.pct_change().tail(252).std() * np.sqrt(252)),
             "dividend_yield": f.get("dividend_yield"),
+            "earnings_ts": f.get("earnings_ts"),
             "market_cap": f.get("market_cap"), "currency": f.get("currency") or ("CAD" if s.endswith(".TO") else "USD"),
             **lv,
         })
