@@ -504,6 +504,8 @@ def run(root: Path, limit: int | None, workers: int) -> int:
             "ml_quintile": int(r["ml_quintile"]) if pd.notna(r["ml_quintile"]) else None,
             "drivers": [[n, round(v, 4)] for n, v in r["drivers"]] if isinstance(r["drivers"], list) else [],
             "vol_1y": clean(r["vol_1y"]), "dividend_yield": clean(r["dividend_yield"]),
+            "earnings_date": (datetime.fromtimestamp(r["earnings_ts"], tz=timezone.utc).date().isoformat()
+                              if pd.notna(r.get("earnings_ts")) and r.get("earnings_ts") else None),
             "signal": r["signal"], "factor_count": int(r["factor_count"]),
             "value_score": clean(r["value_score"], 1), "growth_score": clean(r["growth_score"], 1),
             "quality_score": clean(r["quality_score"], 1),
