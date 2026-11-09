@@ -1603,7 +1603,7 @@ export default function VertexPage() {
       <header className="vx-nav">
         <div className="vx-brand">{I.logo}<span>Vertex<b>Capital</b></span></div>
         <nav className="vx-tabs">
-          <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Portfolio</button>
+          <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Top Picks</button>
           <button className={cls(view === "market" && "on")} onClick={() => setView("market")}>{I.grid}Market</button>
           <button className={cls(view === "terminal" && "on")} onClick={() => setView("terminal")}>{I.term}Strategy Terminal</button>
           <button className={cls(view === "model" && "on")} onClick={() => setView("model")}>{I.book}Model</button>
