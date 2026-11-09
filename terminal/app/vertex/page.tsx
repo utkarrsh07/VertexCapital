@@ -976,6 +976,46 @@ function reasons(s: Stock): [number, string][] {
   return out.sort((a, b) => b[0] - a[0]).slice(0, 5);
 }
 
+function PickChart({ symbol, s, live }: { symbol: string; s: Stock; live: number }) {
+  const [ref, { w }] = useSize<HTMLDivElement>();
+  const [c, setC] = useState<Candle[]>([]);
+  useEffect(() => { fetch(`/api/vertex/candles?symbol=${encodeURIComponent(symbol)}`).then((r) => r.json()).then((j) => setC(j.candles || [])).catch(() => setC([])); }, [symbol]);
+  const h = 230, L = 4, R = 96, T = 10, B = 20;
+  const pts = c.slice(-126).map((x) => [x[0], x[4]] as [string, number]);
+  if (pts.length) pts[pts.length - 1] = [pts[pts.length - 1][0], live];
+  if (pts.length < 2 || w < 60) return <div ref={ref} className="vx-pchart" style={{ height: h }} />;
+  const vals = pts.map((p) => p[1]).concat([s.stop, s.target]);
+  const lo = Math.min(...vals), hi = Math.max(...vals), pad = (hi - lo) * 0.06;
+  const cw = w - L - R, X = (i: number) => L + (i / (pts.length - 1)) * cw, Y = (v: number) => T + ((hi + pad - v) / (hi - lo + 2 * pad)) * (h - T - B);
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+  const up = live >= pts[0][1];
+  const col = up ? "var(--up)" : "var(--dn)";
+  const lines: [string, number, string][] = [["Target", s.target, "var(--up)"], ["Entry", s.entry, "var(--acc)"], ["Stop", s.stop, "var(--dn)"]];
+  return (
+    <div ref={ref} className="vx-pchart" style={{ height: h }}>
+      <svg width={w} height={h}>
+        <defs><linearGradient id="vx-pfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={up ? "#45c08a" : "#e5534b"} stopOpacity="0.25" /><stop offset="1" stopColor={up ? "#45c08a" : "#e5534b"} stopOpacity="0" /></linearGradient></defs>
+        <rect x={L} y={Y(s.target)} width={cw} height={Math.max(0, Y(s.entry) - Y(s.target))} fill="var(--up)" opacity={0.05} />
+        <rect x={L} y={Y(s.entry)} width={cw} height={Math.max(0, Y(s.stop) - Y(s.entry))} fill="var(--dn)" opacity={0.06} />
+        <path d={`${d}L${X(pts.length - 1)},${h - B}L${L},${h - B}Z`} fill="url(#vx-pfill)" />
+        <path d={d} fill="none" stroke={col} strokeWidth={1.8} className="vx-draw" pathLength={1} />
+        {lines.map(([k, v, cl]) => (
+          <g key={k}>
+            <line x1={L} x2={L + cw} y1={Y(v)} y2={Y(v)} stroke={cl} strokeDasharray="4 4" opacity={0.8} />
+            <text x={L + cw + 6} y={Y(v) + 4} fill={cl} className="vx-plv">{k} {fx(v)}</text>
+          </g>
+        ))}
+        <circle cx={X(pts.length - 1)} cy={Y(live)} r={3.5} fill={col} />
+        {[0, Math.floor((pts.length - 1) / 2), pts.length - 1].map((i) => (
+          <text key={i} x={X(i)} y={h - 4} textAnchor={i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle"} className="vx-axis">
+            {new Date(pts[i][0] + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 /* ============================================================ portfolio builder */
 type Answers = { horizon: number; reaction: number; goal: number; tolerance: number; market: number; amount: number; count: number; fractional: boolean };
 const DEFAULT_ANSWERS: Answers = { horizon: 2, reaction: 1, goal: 1, tolerance: 1, market: 2, amount: 10000, count: 12, fractional: true };
