@@ -955,6 +955,27 @@ function earningsChip(d?: string | null) {
   return null;
 }
 
+/** Plain-language reasons with the percentile that earned them (0..1). */
+function reasons(s: Stock): [number, string][] {
+  const out: [number, string][] = [];
+  const f = s.factors || {};
+  const peer = s.sector.replace("Information Technology", "tech").replace("Communication Services", "communications").toLowerCase();
+  const add = (k: string, txt: (val: number, pc: number) => string) => {
+    const pc = f[k]?.pct ?? null, val = f[k]?.value ?? null;
+    if (pc != null && val != null && pc >= 0.75) out.push([pc, txt(val, Math.min(99, Math.round(pc * 100)))]);
+  };
+  if (s.ml_quintile === 5) out.push([0.995, `Top 20% of the machine-learning ranking${s.hit_prob ? `; that group beat the universe in ${Math.round(s.hit_prob * 100)}% of past months` : ""}`]);
+  add("revenue_growth", (x, pc) => `Revenue up ${(x * 100).toFixed(0)}% year over year, faster than ${pc}% of ${peer} peers`);
+  add("forward_pe", (x, pc) => `Cheaper than ${pc}% of ${peer} peers on forward earnings (${x.toFixed(1)}× P/E)`);
+  add("peg", (x, pc) => `PEG of ${x.toFixed(2)}: inexpensive for its growth compared with ${pc}% of peers`);
+  add("profit_margin", (x, pc) => `${(x * 100).toFixed(0)}% profit margin, better than ${pc}% of peers`);
+  add("roe", (x, pc) => `Return on equity of ${(x * 100).toFixed(0)}%, higher than ${pc}% of peers`);
+  add("debt_to_equity", (x, pc) => `Light balance sheet: debt is ${x.toFixed(2)}× equity, lower than ${pc}% of peers`);
+  add("momentum_6m", (x, pc) => `Up ${(x * 100).toFixed(0)}% over six months, stronger than ${pc}% of peers`);
+  if ((s.alpha ?? 0) > 0.1) out.push([Math.min(0.95, 0.75 + (s.alpha ?? 0) / 2), `Beat the S&P 500 by ${((s.alpha ?? 0) * 100).toFixed(0)}% over the past year after adjusting for risk`]);
+  return out.sort((a, b) => b[0] - a[0]).slice(0, 5);
+}
+
 /* ============================================================ portfolio builder */
 type Answers = { horizon: number; reaction: number; goal: number; tolerance: number; market: number; amount: number; count: number; fractional: boolean };
 const DEFAULT_ANSWERS: Answers = { horizon: 2, reaction: 1, goal: 1, tolerance: 1, market: 2, amount: 10000, count: 12, fractional: true };
