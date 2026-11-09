@@ -122,11 +122,14 @@ def _num(v):
 
 
 def _div_yield(info: dict):
-    y = _num(info.get("dividendYield"))
-    if y is None:
-        y = _num(info.get("trailingAnnualDividendYield"))
-    if y is not None and y > 0.25:      # some Yahoo versions report percent, not fraction
-        y = y / 100.0
+    """Dividend yield as a fraction. trailingAnnualDividendYield is a fraction; recent Yahoo versions
+    report dividendYield in percent (0.42 = 0.42%), so it is only a fallback and is divided by 100."""
+    y = _num(info.get("trailingAnnualDividendYield"))
+    if y is None or y == 0:
+        d = _num(info.get("dividendYield"))
+        y = d / 100.0 if d is not None else y
+    if y is not None and y > 0.25:
+        y = None                         # implausible; leave blank rather than show a wrong number
     return y
 
 
