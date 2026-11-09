@@ -1884,7 +1884,7 @@ export default function VertexPage() {
           </footer>
         </main>
       ) : (
-        <PortfolioBuilder report={report} px={px} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
+        <TopPicks report={report} px={px} chg={chg} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
       )}
 
       {showMethod && report && (
