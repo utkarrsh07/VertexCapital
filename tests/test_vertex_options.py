@@ -29,3 +29,11 @@ def test_mock_chain_prices_are_sane():
     k = min(ks, key=lambda x: abs(x - 120))
     parity = (calls[k]["last"] - puts[k]["last"]) - (120 - k * 2.718281828 ** (-c["rate"] * c["dte"] / 365))
     assert abs(parity) < 0.05                                                    # put-call parity holds
+
+
+def test_script_outputs_json_and_rejects_tsx():
+    out = subprocess.run([sys.executable, str(SCRIPT), "AAPL", "--mock", "--spot", "200"], capture_output=True, text=True)
+    d = json.loads(out.stdout)
+    assert d["symbol"] == "AAPL" and d["calls"] and d["puts"]
+    out = subprocess.run([sys.executable, str(SCRIPT), "RY.TO", "--mock"], capture_output=True, text=True)
+    assert "error" in json.loads(out.stdout)
