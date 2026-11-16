@@ -59,6 +59,13 @@ def test_signals_are_decisive_tiers():
     assert out["composite"].between(0, 100).all()
 
 
+def test_evidence_weight_scales_with_t_stat():
+    assert vs.evidence_weight(-1.0) == 0.25
+    assert abs(vs.evidence_weight(1.0) - 0.35) < 1e-9
+    assert vs.evidence_weight(9.0) == 0.65
+    assert vs.evidence_weight(None) == vs.W_ML
+
+
 def test_portfolio_respects_caps():
     rows, prices = [], {}
     for i in range(30):
