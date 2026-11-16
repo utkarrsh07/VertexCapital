@@ -1232,6 +1232,35 @@ function buildStrategies(ch: Chain, s: Stock): Strat[] {
   return out;
 }
 
+function stratStats(st: Strat, ch: Chain) {
+  const S = ch.spot, r = ch.rate, T = Math.max(ch.dte, 0.5) / 365;
+  const lo = S * 0.3, hi = S * 2.2, n = 400;
+  let maxG = -Infinity, maxL = Infinity;
+  const be: number[] = [];
+  let prev: number | null = null, prevX = lo;
+  for (let i = 0; i <= n; i++) {
+    const x = lo + ((hi - lo) * i) / n, v = pnl(st, x, 0, r);
+    maxG = Math.max(maxG, v); maxL = Math.min(maxL, v);
+    if (prev != null && Math.sign(v) !== Math.sign(prev) && v !== 0) be.push(prevX + (x - prevX) * (-prev / (v - prev)));
+    prev = v; prevX = x;
+  }
+  const atZero = pnl(st, 0.0001, 0, r);
+  const unlimited = pnl(st, hi * 3, 0, r) > maxG + 1;
+  const iv = st.legs.find((l) => l.kind !== "stock")?.iv ?? 0.35;
+  let pop = 0;
+  if (be.length) {
+    const rising = pnl(st, be[0] * 1.05, 0, r) > 0;
+    pop = rising ? probAbove(S, be[0], T, r, iv) : 1 - probAbove(S, be[0], T, r, iv);
+  }
+  const g = st.legs.reduce((a, l) => {
+    if (l.kind === "stock") return { ...a, delta: a.delta + l.side };
+    const q = bs(S, l.strike, T, r, l.iv, l.kind === "call");
+    return { delta: a.delta + l.side * q.delta, theta: a.theta + l.side * q.theta, vega: a.vega + l.side * q.vega };
+  }, { delta: 0, theta: 0, vega: 0 });
+  return { maxGain: unlimited ? Infinity : maxG, maxLoss: Math.min(maxL, atZero), breakevens: be, pop, iv,
+    delta: g.delta * 100, theta: g.theta * 100, vega: g.vega * 100 };
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
