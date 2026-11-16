@@ -1461,7 +1461,7 @@ export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [savedLog, setSavedLog] = useState<string[]>([]);
-  const [view, setView] = useState<"terminal" | "dashboard" | "market" | "model">("terminal");
+  const [view, setView] = useState<"terminal" | "dashboard" | "market" | "model" | "options">("terminal");
   const [universe, setUniverse] = useState("All");
   const [sel, setSel] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -1713,7 +1713,9 @@ export default function VertexPage() {
         </div>
       )}
 
-      {view === "model" ? (
+      {view === "options" ? (
+        <OptionsLab report={report} px={px} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
+      ) : view === "model" ? (
         <ModelView report={report} />
       ) : view === "market" ? (
         <MarketView report={report} clock={clock} onOpen={(sym) => { setSel(sym); setView("terminal"); }} />
