@@ -121,3 +121,26 @@ def live_chain(symbol: str, expiry: str | None) -> dict:
     return {"symbol": symbol, "spot": spot, "rate": rate, "expiry": exp, "dte": (date.fromisoformat(exp) - today).days,
             "expirations": exps, "calls": rows(oc.calls), "puts": rows(oc.puts), "source": "yahoo",
             "fetched": datetime.now(timezone.utc).isoformat()}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("symbol")
+    ap.add_argument("--expiry")
+    ap.add_argument("--mock", action="store_true")
+    ap.add_argument("--spot", type=float, default=100.0)
+    a = ap.parse_args()
+    sym = a.symbol.upper()
+    if sym.endswith(".TO"):
+        out = {"symbol": sym, "error": "Options Lab covers US-listed stocks only."}
+    else:
+        try:
+            out = mock_chain(sym, a.spot, a.expiry) if a.mock else live_chain(sym, a.expiry)
+        except Exception as exc:
+            out = {"symbol": sym, "error": f"Option chain unavailable: {type(exc).__name__}: {exc}"[:300]}
+    sys.stdout.write(json.dumps(out))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
