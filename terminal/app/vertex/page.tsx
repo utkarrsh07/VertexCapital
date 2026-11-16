@@ -1261,6 +1261,72 @@ function stratStats(st: Strat, ch: Chain) {
     delta: g.delta * 100, theta: g.theta * 100, vega: g.vega * 100 };
 }
 
+function PayoffChart({ st, ch, s }: { st: Strat; ch: Chain; s: Stock }) {
+  const [ref, { w }] = useSize<HTMLDivElement>();
+  const [hx, setHx] = useState<number | null>(null);
+  const h = 280, L = 56, R = 16, T0 = 14, B = 26;
+  const S = ch.spot, r = ch.rate, T = Math.max(ch.dte, 0.5) / 365;
+  const lo = Math.min(S * 0.75, s.stop * 0.95), hi = Math.max(S * 1.25, s.target * 1.05), n = 160;
+  const xs = Array.from({ length: n + 1 }, (_, i) => lo + ((hi - lo) * i) / n);
+  const atExp = xs.map((x) => pnl(st, x, 0, r));
+  const today = xs.map((x) => pnl(st, x, T, r));
+  const ymin = Math.min(...atExp, ...today), ymax = Math.max(...atExp, ...today), pad = (ymax - ymin) * 0.1 || 50;
+  const cw = Math.max(10, w - L - R), ch2 = h - T0 - B;
+  const X = (x: number) => L + ((x - lo) / (hi - lo)) * cw;
+  const Y = (v: number) => T0 + ((ymax + pad - v) / (ymax - ymin + 2 * pad)) * ch2;
+  const path = (ys: number[]) => ys.map((v, i) => `${i ? "L" : "M"}${X(xs[i]).toFixed(1)},${Y(v).toFixed(1)}`).join("");
+  const zero = Y(0);
+  const pos = `${path(atExp.map((v) => Math.max(v, 0)))}L${X(hi)},${zero}L${X(lo)},${zero}Z`;
+  const neg = `${path(atExp.map((v) => Math.min(v, 0)))}L${X(hi)},${zero}L${X(lo)},${zero}Z`;
+  const marks: [string, number, string][] = [["Stop", s.stop, "var(--dn)"], ["Now", S, "var(--txt)"], ["Target", s.target, "var(--up)"]];
+  const hv = hx != null ? { x: hx, e: pnl(st, hx, 0, r), t: pnl(st, hx, T, r) } : null;
+  return (
+    <div ref={ref} className="vx-pay" style={{ minHeight: h }}
+      onMouseMove={(e) => { const b = e.currentTarget.getBoundingClientRect(); const x = lo + ((e.clientX - b.left - L) / cw) * (hi - lo); setHx(x >= lo && x <= hi ? x : null); }}
+      onMouseLeave={() => setHx(null)}>
+      {w > 60 && (
+        <svg width={w} height={h}>
+          <clipPath id="vx-pay-clip"><rect x={L} y={T0} width={cw} height={ch2} /></clipPath>
+          {(() => {
+            const span = ymax - ymin + 2 * pad, raw = span / 5, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+            const step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= raw) || raw;
+            const ticks: number[] = [];
+            for (let v = Math.ceil((ymin - pad) / step) * step; v <= ymax + pad; v += step) ticks.push(v);
+            return ticks.map((v) => (
+              <g key={v}><line x1={L} x2={L + cw} y1={Y(v)} y2={Y(v)} className="vx-grid" />
+                <text x={L - 6} y={Y(v) + 3} textAnchor="end" className="vx-axis">{v === 0 ? "$0" : `${v > 0 ? "+" : "−"}$${Math.abs(v).toLocaleString("en-US")}`}</text></g>
+            ));
+          })()}
+          <g clipPath="url(#vx-pay-clip)">
+            <path d={pos} fill="var(--up)" opacity={0.14} />
+            <path d={neg} fill="var(--dn)" opacity={0.14} />
+            <line x1={L} x2={L + cw} y1={zero} y2={zero} stroke="var(--mut)" />
+            <path d={path(today)} fill="none" stroke="var(--mut)" strokeDasharray="4 4" strokeWidth={1.3} />
+            <path d={path(atExp)} fill="none" stroke="var(--acc)" strokeWidth={2.4} className="vx-draw" pathLength={1} />
+          </g>
+          {marks.map(([k, v, c]) => (
+            <g key={k}>
+              <line x1={X(v)} x2={X(v)} y1={T0} y2={T0 + ch2} stroke={c} strokeDasharray="2 4" opacity={0.7} />
+              <text x={X(v)} y={h - 8} textAnchor="middle" fill={c} className="vx-plv">{k} {fx(v)}</text>
+            </g>
+          ))}
+          {hv && (
+            <g>
+              <line x1={X(hv.x)} x2={X(hv.x)} y1={T0} y2={T0 + ch2} className="vx-cross" />
+              <circle cx={X(hv.x)} cy={Y(hv.e)} r={4} fill="var(--acc)" />
+            </g>
+          )}
+        </svg>
+      )}
+      <div className="vx-pay-leg">
+        <span><i style={{ background: "var(--acc)" }} />At expiry ({ch.expiry})</span>
+        <span><i className="dash" />Today</span>
+        {hv && <span className="vx-pay-hv">If {tick(s.symbol)} is {fx(hv.x)}: <b className={hv.e >= 0 ? "up" : "dn"}>{hv.e >= 0 ? "+" : "−"}{money(Math.abs(hv.e))}</b> at expiry · {hv.t >= 0 ? "+" : "−"}{money(Math.abs(hv.t))} today</span>}
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
