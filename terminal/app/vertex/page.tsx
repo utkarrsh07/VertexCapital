@@ -1176,6 +1176,19 @@ function bs(S: number, K: number, T: number, r: number, iv: number, call: boolea
 const probAbove = (S: number, x: number, T: number, r: number, iv: number) =>
   T <= 0 || iv <= 0 ? (S > x ? 1 : 0) : ncdf((Math.log(S / x) + (r - iv * iv / 2) * T) / (iv * Math.sqrt(T)));
 
+const mid = (o?: OptRow) => !o ? 0 : o.bid != null && o.ask != null && o.ask > 0 ? (o.bid + o.ask) / 2 : (o.last ?? 0);
+const nearest = (rows: OptRow[], x: number, f: (o: OptRow) => boolean = () => true) =>
+  rows.filter((o) => f(o) && (o.ask ?? 0) > 0).sort((a, b) => Math.abs(a.strike - x) - Math.abs(b.strike - x))[0];
+
+function legValue(l: Leg, S: number, T: number, r: number) {
+  if (l.kind === "stock") return S;
+  return bs(S, l.strike, T, r, l.iv, l.kind === "call").price;
+}
+/** P&L per 1 contract (100 shares) at stock price S with T years left. */
+function pnl(st: Strat, S: number, T: number, r: number) {
+  return st.legs.reduce((t, l) => t + l.side * (legValue(l, S, T, r) - l.price), 0) * 100;
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
