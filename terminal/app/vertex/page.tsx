@@ -1327,6 +1327,135 @@ function PayoffChart({ st, ch, s }: { st: Strat; ch: Chain; s: Stock }) {
   );
 }
 
+function OptionsLab({ report, px, onOpen }: { report: Report | null; px: (s: Stock) => number; onOpen: (s: string) => void }) {
+  const us = useMemo(() => (report?.stocks || []).filter((s) => !s.symbol.endsWith(".TO") && s.score != null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0)), [report]);
+  const [sym, setSym] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [expiry, setExpiry] = useState<string>("");
+  const [chain, setChain] = useState<Chain | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [pick, setPick] = useState("spread");
+  const s = us.find((x) => x.symbol === sym) || us.find((x) => isBuy(x.signal)) || us[0];
+  const list = useMemo(() => {
+    const qq = q.trim().toUpperCase();
+    return (qq ? us.filter((x) => x.symbol.includes(qq) || x.name.toUpperCase().includes(qq)) : us.filter((x) => isBuy(x.signal))).slice(0, 40);
+  }, [us, q]);
+  useEffect(() => {
+    if (!s) return;
+    let dead = false;
+    setLoading(true);
+    fetch(`/api/vertex/options?symbol=${encodeURIComponent(s.symbol)}${expiry ? `&expiry=${expiry}` : ""}&ref=${px(s).toFixed(2)}`)
+      .then((r) => r.json()).then((j) => { if (!dead) setChain(j); }).catch(() => { if (!dead) setChain({ error: "Request failed." } as Chain); })
+      .finally(() => { if (!dead) setLoading(false); });
+    return () => { dead = true; };
+  }, [s?.symbol, expiry]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const strats = useMemo(() => (chain && !chain.error && s ? buildStrategies(chain, s) : []), [chain, s]);
+  const stats = useMemo(() => Object.fromEntries(strats.map((st) => [st.key, stratStats(st, chain as Chain)])), [strats, chain]);
+  const cur = strats.find((x) => x.key === pick) || strats[0];
+  const cs = cur ? stats[cur.key] : null;
+  const atmIv = cs?.iv;
+  const move = chain && !chain.error && atmIv ? chain.spot * atmIv * Math.sqrt(Math.max(chain.dte, 0.5) / 365) : null;
+  const legTxt = (l: Leg) => l.kind === "stock" ? `${l.side > 0 ? "Own" : "Short"} 100 shares at ${fx(l.price)}`
+    : `${l.side > 0 ? "Buy" : "Sell"} 1 ${tick(chain?.symbol || "")} ${fx(l.strike, l.strike % 1 ? 1 : 0)} ${l.kind} · ${fx(l.price)} mid${l.row ? ` (bid ${fx(l.row.bid)} / ask ${fx(l.row.ask)}, OI ${l.row.oi.toLocaleString()})` : ""}`;
+  const m = (v: number) => (v === Infinity ? "Unlimited" : `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`);
+
+  if (!report) return <main className="vx-opt"><h1 className="vx-h1">Options Lab</h1><section className="vx-card vx-pad">Run a scan first.</section></main>;
+  return (
+    <main className="vx-opt">
+      <div className="vx-mhead">
+        <div>
+          <h1 className="vx-h1">Options Lab</h1>
+          <p className="vx-sub2">Defined-risk option ideas built from each stock&apos;s entry, stop and target. US-listed stocks only. Ideas, not orders: nothing here places a trade.</p>
+        </div>
+      </div>
+      <div className="vx-ol">
+        <section className="vx-card vx-ol-list">
+          <div className="vx-search"><span className="vx-in">{I.search}<input placeholder="Search any US stock" value={q} onChange={(e) => setQ(e.target.value)} /></span></div>
+          <div className="vx-muted sm vx-ol-cap">{q ? "Search results" : "Buy-rated US stocks"}</div>
+          {list.map((x) => (
+            <button key={x.symbol} className={cls("vx-ol-row", x.symbol === s?.symbol && "on")} onClick={() => { setSym(x.symbol); setExpiry(""); }}>
+              <span><b>{tick(x.symbol)}</b><small>{x.name}</small></span>
+              <span className={cls("vx-sig", sigCls(x.signal))}>{SIG_SHORT[x.signal]}</span>
+              <span className="vx-num">{fx(px(x))}</span>
+            </button>
+          ))}
+        </section>
+
+        {s && (
+          <section className="vx-card vx-ol-main">
+            <div className="vx-pd-h">
+              <div>
+                <div className="vx-pd-t"><b>{tick(s.symbol)}</b><span className={cls("vx-sig", sigCls(s.signal))}>{SIG_SHORT[s.signal]}</span>{earningsChip(s.earnings_date)}</div>
+                <div className="vx-muted">{s.name} · entry {fx(s.entry)} · stop {fx(s.stop)} · target {fx(s.target)}</div>
+              </div>
+              <div className="vx-ol-exp">
+                <label className="vx-muted sm" htmlFor="vx-exp">Expiry</label>
+                <select id="vx-exp" value={chain?.expiry || ""} onChange={(e) => setExpiry(e.target.value)} disabled={!chain?.expirations}>
+                  {(chain?.expirations || []).map((e) => {
+                    const d = Math.round((new Date(e + "T16:00:00").getTime() - Date.now()) / 86400000);
+                    return <option key={e} value={e}>{e} ({d}d)</option>;
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {loading && <div className="vx-empty sm">Loading option chain…</div>}
+            {!loading && chain?.error && <div className="vx-empty sm">{chain.error}</div>}
+            {!loading && chain && !chain.error && (
+              <>
+                <div className="vx-pd-stats">
+                  <div><span>Share price</span><b>{fx(chain.spot)}</b><small>{chain.source === "mock" ? "demo chain" : "Yahoo, delayed"}</small></div>
+                  <div><span>Implied volatility</span><b>{pct(atmIv, 0, false)}</b><small>at the money</small></div>
+                  <div><span>Expected move by expiry</span><b>±{fx(move)}</b><small>±{pct(move != null ? move / chain.spot : null, 1, false)} · 1 std. dev.</small></div>
+                  <div><span>Days to expiry</span><b>{chain.dte}</b><small>{chain.expiry}</small></div>
+                </div>
+
+                <div className="vx-ol-tabs" role="tablist">
+                  {strats.map((st) => (
+                    <button key={st.key} role="tab" aria-selected={cur?.key === st.key} className={cls(cur?.key === st.key && "on")} onClick={() => setPick(st.key)}>
+                      <b>{st.name}</b>
+                      <span>Chance of profit {pct(stats[st.key].pop, 0, false)}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {cur && cs && (
+                  <div className="vx-ol-body">
+                    <p className="vx-ol-idea">{cur.idea}</p>
+                    <PayoffChart st={cur} ch={chain} s={s} />
+                    <div className="vx-ol-grid">
+                      <div className="vx-ol-k">
+                        <span>Max loss</span><b className="dn">{m(cs.maxLoss)}</b>
+                        <span>Max gain</span><b className="up">{m(cs.maxGain)}</b>
+                        <span>Breakeven</span><b>{cs.breakevens.length ? cs.breakevens.map((b) => fx(b)).join(" / ") : "—"}</b>
+                        <span>Chance of profit</span><b className="vx-acc">{pct(cs.pop, 0, false)}</b>
+                        <span>Capital required</span><b>{money(cur.capital)}</b>
+                        <span>Delta / theta / vega</span><b>{cs.delta.toFixed(0)} · {cs.theta >= 0 ? "+" : "−"}${Math.abs(cs.theta).toFixed(2)}/day · {cs.vega.toFixed(1)}</b>
+                      </div>
+                      <div>
+                        <h4>Legs (1 contract = 100 shares)</h4>
+                        <ul className="vx-legs">{cur.legs.map((l, i) => <li key={i}>{legTxt(l)}</li>)}</ul>
+                        {cur.warn.map((w) => <div key={w} className="vx-warn">{w}</div>)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="vx-pd-f">
+              <span className="vx-muted sm">Prices are mid-market and delayed; fills will differ. Chance of profit uses implied volatility (market-implied odds, not a forecast).</span>
+              <button className="vx-p2-open" onClick={() => onOpen(s.symbol)}>Open in Strategy Terminal</button>
+            </div>
+          </section>
+        )}
+      </div>
+      <div className="vx-disc">Education and research only, not advice. Options can lose 100% of their value quickly; every idea here has a defined maximum loss, shown above. Not backtested: free data has no option price history.</div>
+    </main>
+  );
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
