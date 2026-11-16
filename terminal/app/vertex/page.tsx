@@ -1142,6 +1142,40 @@ function TopPicks({ report, px, chg, onOpen }: { report: Report | null; px: (s: 
   );
 }
 
+/* ============================================================ options lab */
+type OptRow = { strike: number; bid: number | null; ask: number | null; last: number | null; iv: number | null; volume: number; oi: number };
+type Chain = { symbol: string; spot: number; rate: number; expiry: string; dte: number; expirations: string[];
+  calls: OptRow[]; puts: OptRow[]; source: string; error?: string };
+type Leg = { side: 1 | -1; kind: "call" | "put" | "stock"; strike: number; price: number; iv: number; row?: OptRow };
+type Strat = { key: string; name: string; idea: string; legs: Leg[]; capital: number; warn: string[] };
+
+const ncdf = (x: number) => {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp(-x * x / 2);
+  const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  return x > 0 ? 1 - p : p;
+};
+const npdf = (x: number) => Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI);
+
+/** Black-Scholes price and Greeks for one option (per share). */
+function bs(S: number, K: number, T: number, r: number, iv: number, call: boolean) {
+  if (T <= 0 || iv <= 0) {
+    const intr = Math.max(0, call ? S - K : K - S);
+    return { price: intr, delta: call ? (S > K ? 1 : 0) : (S < K ? -1 : 0), gamma: 0, theta: 0, vega: 0 };
+  }
+  const sq = Math.sqrt(T), d1 = (Math.log(S / K) + (r + iv * iv / 2) * T) / (iv * sq), d2 = d1 - iv * sq;
+  const disc = Math.exp(-r * T);
+  const price = call ? S * ncdf(d1) - K * disc * ncdf(d2) : K * disc * ncdf(-d2) - S * ncdf(-d1);
+  const delta = call ? ncdf(d1) : ncdf(d1) - 1;
+  const gamma = npdf(d1) / (S * iv * sq);
+  const theta = (-S * npdf(d1) * iv / (2 * sq) - (call ? 1 : -1) * r * K * disc * ncdf(call ? d2 : -d2)) / 365;
+  const vega = S * npdf(d1) * sq / 100;
+  return { price, delta, gamma, theta, vega };
+}
+/** Chance the stock finishes above x at expiry, from the market's implied volatility (risk-neutral). */
+const probAbove = (S: number, x: number, T: number, r: number, iv: number) =>
+  T <= 0 || iv <= 0 ? (S > x ? 1 : 0) : ncdf((Math.log(S / x) + (r - iv * iv / 2) * T) / (iv * Math.sqrt(T)));
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
