@@ -1688,6 +1688,7 @@ export default function VertexPage() {
           <button className={cls(view === "dashboard" && "on")} onClick={() => setView("dashboard")}>{I.dash}Top Picks</button>
           <button className={cls(view === "market" && "on")} onClick={() => setView("market")}>{I.grid}Market</button>
           <button className={cls(view === "terminal" && "on")} onClick={() => setView("terminal")}>{I.term}Strategy Terminal</button>
+          <button className={cls(view === "options" && "on")} onClick={() => setView("options")}>{I.term}Options Lab</button>
           <button className={cls(view === "model" && "on")} onClick={() => setView("model")}>{I.book}Model</button>
           <button onClick={() => setShowMethod(true)}>{I.book}Methodology</button>
           <button onClick={runScan} disabled={scanning}>{I.refresh}{scanning ? "Scanning…" : "Run Scan"}</button>
