@@ -701,6 +701,22 @@
 .vx-ol-tabs button.on { border-color: var(--acc) !important; background: var(--sel) !important; }
 .vx-ol-tabs button.on b { color: var(--acc); }
 .vx-ol-tabs button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.vx-ol-idea { margin: 0; font-size: 13px; line-height: 1.55; max-width: 90ch; }
+.vx-pay { position: relative; }
+.vx-pay svg { display: block; }
+.vx-pay-leg { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: var(--mut); margin: 4px 0 6px; }
+.vx-pay-leg i { display: inline-block; width: 14px; height: 2px; margin-right: 6px; vertical-align: middle; }
+.vx-pay-leg i.dash { border-top: 2px dashed var(--mut); height: 0; }
+.vx-pay-hv { margin-left: auto; color: var(--txt); }
+.vx-ol-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px; }
+.vx-ol-k { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12.5px; align-content: start; }
+.vx-ol-k span { color: var(--mut); }
+.vx-ol-k b { text-align: right; font-weight: 700; }
+.vx-ol-grid h4 { margin: 0 0 8px; font-size: 13px; font-weight: 750; }
+.vx-legs { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 5px; font-size: 12.5px; }
+.vx-warn { font-size: 12px; color: var(--acc); border-left: 2px solid var(--acc); padding: 4px 10px; margin-top: 6px; }
+@media (max-width: 1100px) { .vx-ol, .vx-ol-grid { grid-template-columns: 1fr; } .vx-ol-tabs { grid-template-columns: 1fr 1fr; } .vx-ol-list { position: static; max-height: 320px; } }
+
 @media (max-width: 1200px) {
   .vx-kpis { grid-template-columns: repeat(3, 1fr); }
   .vx-mgrid2, .vx-verdict { grid-template-columns: 1fr; }
