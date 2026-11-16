@@ -52,6 +52,7 @@ FEATURES = [
     ("rsi14", "RSI(14)"),
     ("smom", "Sector-relative momentum"),
     ("rmom", "Residual momentum"),
+    ("imom", "Industry momentum"),
 ]
 FEATURE_LABEL = dict(FEATURES)
 
@@ -109,6 +110,16 @@ def compute_features(close: pd.DataFrame, volume: pd.DataFrame, sectors: dict[st
     # residual momentum (Blitz, Huij & Martens 2011): 12-1 month market-neutral return, scaled by its own volatility
     rs = resid.rolling(231, min_periods=180)
     f["rmom"] = (rs.sum() / (rs.std() * math.sqrt(231))).shift(21)
+    # industry momentum (Moskowitz & Grinblatt 1999): median 6-month return of the stock's sector
+    m6 = close / close.shift(126) - 1
+    imom = pd.DataFrame(index=m6.index, columns=m6.columns, dtype=float)
+    for s_name, members in sec.groupby(sec).groups.items():
+        cols = [c for c in members if c in m6.columns]
+        if cols:
+            med = m6[cols].median(axis=1)
+            for c in cols:
+                imom[c] = med
+    f["imom"] = imom
     return f, beta
 
 
