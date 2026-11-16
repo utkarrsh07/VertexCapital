@@ -51,6 +51,7 @@ FEATURES = [
     ("volshock", "Volume shock 20d/120d"),
     ("rsi14", "RSI(14)"),
     ("smom", "Sector-relative momentum"),
+    ("rmom", "Residual momentum"),
 ]
 FEATURE_LABEL = dict(FEATURES)
 
@@ -105,6 +106,9 @@ def compute_features(close: pd.DataFrame, volume: pd.DataFrame, sectors: dict[st
             for c in cols:
                 smed[c] = med
     f["smom"] = mom - smed
+    # residual momentum (Blitz, Huij & Martens 2011): 12-1 month market-neutral return, scaled by its own volatility
+    rs = resid.rolling(231, min_periods=180)
+    f["rmom"] = (rs.sum() / (rs.std() * math.sqrt(231))).shift(21)
     return f, beta
 
 
