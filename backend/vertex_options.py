@@ -41,3 +41,12 @@ def _bs(spot, k, t, r, iv, call):
     if call:
         return spot * _ncdf(d1) - k * math.exp(-r * t) * _ncdf(d2)
     return k * math.exp(-r * t) * _ncdf(-d2) - spot * _ncdf(-d1)
+
+
+def pick_expiry(expiries: list[str], today: date) -> str | None:
+    dte = [(e, (date.fromisoformat(e) - today).days) for e in expiries]
+    for lo, hi in ((25, 60), (14, 90), (7, 400)):
+        ok = [e for e, d in dte if lo <= d <= hi]
+        if ok:
+            return ok[0]
+    return expiries[0] if expiries else None
