@@ -551,6 +551,14 @@ def run(root: Path, limit: int | None, workers: int) -> int:
                       "In a risk-off market regime, STRONG BUY also requires price above the 50-day average.",
             "portfolio": pstats.get("method", "") if len(port) else "",
             "alpha": "Jensen's alpha vs SPY from 1 year of daily returns, annualised. Descriptive, not predictive.",
+            "research": "Signals and methods follow published research: momentum (Jegadeesh & Titman 1993); "
+                        "industry momentum (Moskowitz & Grinblatt 1999); residual momentum (Blitz, Huij & Martens 2011); "
+                        "52-week-high proximity (George & Hwang 2004); short-term reversal (Jegadeesh 1990); "
+                        "low volatility and idiosyncratic volatility (Ang, Hodrick, Xing & Zhang 2006); "
+                        "betting against beta (Frazzini & Pedersen 2014); lottery/max effect (Bali, Cakici & Whitelaw 2011); "
+                        "illiquidity (Amihud 2002); profitability (Novy-Marx 2013) and quality (Asness, Frazzini & Pedersen 2019); "
+                        "machine learning for the cross-section of returns (Gu, Kelly & Xiu 2020); "
+                        "shrinkage covariance (Ledoit & Wolf 2004); walk-forward testing with purging (Lopez de Prado 2018).",
             "disclaimer": "Research and demonstration tool. Not investment advice. No trades are placed.",
         },
         "stocks": stocks,
