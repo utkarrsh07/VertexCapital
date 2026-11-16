@@ -480,7 +480,11 @@ def run(root: Path, limit: int | None, workers: int) -> int:
         df["ml_quintile"] = np.nan
         df["drivers"] = None
 
-    df = composite_and_signals(df, reg)
+    w_ml = evidence_weight(ml_report["validation"]["ic_t"]) if ml_report else W_ML
+    log("SCORE", f"blend: {w_ml:.0%} machine learning / {1 - w_ml:.0%} fundamentals "
+                 f"(set by out-of-sample IC t-stat {ml_report['validation']['ic_t']:.2f})" if ml_report else
+                 f"blend: fundamentals only (no model)")
+    df = composite_and_signals(df, reg, w_ml)
     top = df.sort_values("composite", ascending=False).head(10)
     for _, r in top.iterrows():
         log("LEVELS", f"{r['symbol']:<9} comp={r['composite']:5.1f} ml={100 * (r['ml_pct'] if pd.notna(r['ml_pct']) else 0):5.1f} "
@@ -539,8 +543,10 @@ def run(root: Path, limit: int | None, workers: int) -> int:
                        f"<{MIN_SECTOR_SIZE} names). Weighted average of available percentiles x 100; needs {MIN_FACTORS}/9 factors.",
             "levels": "Entry: pullback toward 20-day average (max 1.5 ATR below price). Stop: 2 ATR below entry or just under "
                       "20-day low. Target: 2R, or the 60-day high when it sits 1.5R-4R above entry.",
-            "composite": f"Score = {W_ML:.0%} machine-learning rank (price/volume model, walk-forward validated) + "
-                         f"{W_FUND:.0%} fundamental rank (9 sector-relative factors), re-ranked 0-100 across the universe.",
+            "composite": f"Score = {w_ml:.0%} machine-learning rank (price/volume model, walk-forward validated) + "
+                         f"{1 - w_ml:.0%} fundamental rank (9 sector-relative factors), re-ranked 0-100 across the universe. "
+                         "The machine-learning share is set each scan by its out-of-sample evidence (IC t-statistic): "
+                         "25% with no edge, up to 65% when the edge is strong.",
             "signal": "Relative tiers by score: top 15% STRONG BUY, next 20% BUY, middle 30% HOLD, next 20% REDUCE, bottom 15% SELL. "
                       "In a risk-off market regime, STRONG BUY also requires price above the 50-day average.",
             "portfolio": pstats.get("method", "") if len(port) else "",
