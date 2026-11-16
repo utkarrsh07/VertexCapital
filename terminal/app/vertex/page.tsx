@@ -1189,6 +1189,49 @@ function pnl(st: Strat, S: number, T: number, r: number) {
   return st.legs.reduce((t, l) => t + l.side * (legValue(l, S, T, r) - l.price), 0) * 100;
 }
 
+function buildStrategies(ch: Chain, s: Stock): Strat[] {
+  const S = ch.spot, T = Math.max(ch.dte, 0.5) / 365;
+  const ivs = [...ch.calls, ...ch.puts].map((o) => o.iv).filter((v): v is number => v != null && v > 0.03 && v < 3);
+  const atm = nearest(ch.calls, S);
+  const atmIv = atm?.iv && atm.iv > 0.03 && atm.iv < 3 ? atm.iv : ivs.length ? ivs.sort((a, b) => a - b)[Math.floor(ivs.length / 2)] : 0.35;
+  const ivOf = (o?: OptRow) => (o?.iv && o.iv > 0.03 && o.iv < 3 ? o.iv : atmIv);
+  const thin = (o?: OptRow) => !o || !o.bid || !o.ask || (o.ask - o.bid) / Math.max(0.01, (o.ask + o.bid) / 2) > 0.25 || o.oi < 100;
+  const earn = s.earnings_date && s.earnings_date <= ch.expiry && s.earnings_date >= new Date().toISOString().slice(0, 10)
+    ? [`Earnings on ${s.earnings_date} fall before expiry. Implied volatility usually drops sharply after the report.`] : [];
+  const out: Strat[] = [];
+  const add = (key: string, name: string, idea: string, legs: Leg[], capital: number, rows: (OptRow | undefined)[]) => {
+    const w = [...earn];
+    if (rows.some(thin)) w.unshift("Thin market: wide bid/ask spread or low open interest. Use limit orders near the mid price.");
+    out.push({ key, name, idea, legs, capital, warn: w });
+  };
+  const L = (side: 1 | -1, kind: "call" | "put", o: OptRow): Leg => ({ side, kind, strike: o.strike, price: mid(o), iv: ivOf(o), row: o });
+
+  const c1 = nearest(ch.calls, Math.max(s.entry, Math.min(S, s.entry * 1.03)));
+  const c2 = c1 ? nearest(ch.calls, s.target, (o) => o.strike > c1.strike) : undefined;
+  if (c1 && c2) {
+    const debit = mid(c1) - mid(c2);
+    add("spread", "Bull call spread", `Pay ${money(debit * 100)} for the right to profit if ${tick(s.symbol)} climbs toward the model's ${fx(s.target)} target. Loss is capped at what you pay.`,
+      [L(1, "call", c1), L(-1, "call", c2)], debit * 100, [c1, c2]);
+  }
+  const p1 = nearest(ch.puts, s.entry, (o) => o.strike <= S);
+  if (p1) {
+    add("csp", "Cash-secured put", `Get paid ${money(mid(p1) * 100)} now; if ${tick(s.symbol)} falls to ${fx(p1.strike)} (near the entry zone) you buy 100 shares there. Needs ${money(p1.strike * 100)} in cash set aside.`,
+      [L(-1, "put", p1)], p1.strike * 100, [p1]);
+  }
+  const cc = nearest(ch.calls, s.target, (o) => o.strike >= S);
+  if (cc) {
+    add("cc", "Covered call", `Own 100 shares and sell a ${fx(cc.strike)} call near the target for ${money(mid(cc) * 100)}. You keep gains up to the strike plus the premium.`,
+      [{ side: 1, kind: "stock", strike: 0, price: S, iv: 0 }, L(-1, "call", cc)], S * 100, [cc]);
+  }
+  const pp = nearest(ch.puts, s.stop, (o) => o.strike <= S);
+  if (pp) {
+    add("pp", "Protective put", `Own 100 shares and buy a ${fx(pp.strike)} put near the stop for ${money(mid(pp) * 100)}. It caps your loss below the stop until expiry.`,
+      [{ side: 1, kind: "stock", strike: 0, price: S, iv: 0 }, L(1, "put", pp)], (S + mid(pp)) * 100, [pp]);
+  }
+  void T;
+  return out;
+}
+
 /* ============================================================ page */
 export default function VertexPage() {
   const [report, setReport] = useState<Report | null>(null);
