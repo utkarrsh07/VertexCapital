@@ -293,12 +293,12 @@ VOL_TARGET = 0.16
 RISK_AVERSION = 6.0
 
 
-def composite_and_signals(df: pd.DataFrame, reg: dict | None) -> pd.DataFrame:
+def composite_and_signals(df: pd.DataFrame, reg: dict | None, w_ml: float = W_ML) -> pd.DataFrame:
     """Blend validated ML rank with fundamental rank; tiers are relative, so signals are decisive."""
     df = df.copy()
     df["fund_pct"] = df["score"].rank(pct=True)
     has_ml = df["ml_pct"].notna() if "ml_pct" in df else pd.Series(False, index=df.index)
-    comp = np.where(has_ml & df["fund_pct"].notna(), W_ML * df.get("ml_pct", 0) + W_FUND * df["fund_pct"],
+    comp = np.where(has_ml & df["fund_pct"].notna(), w_ml * df.get("ml_pct", 0) + (1 - w_ml) * df["fund_pct"],
                     np.where(has_ml, df.get("ml_pct", np.nan), df["fund_pct"]))
     df["composite"] = pd.Series(comp, index=df.index).rank(pct=True) * 100
     pr = df["composite"].rank(pct=True)
