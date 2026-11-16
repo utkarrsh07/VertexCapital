@@ -78,3 +78,46 @@ def mock_chain(symbol: str, spot: float, expiry: str | None) -> dict:
     return {"symbol": symbol, "spot": spot, "rate": DEFAULT_RATE, "expiry": exp,
             "dte": (date.fromisoformat(exp) - today).days, "expirations": exps,
             "calls": calls, "puts": puts, "source": "mock", "fetched": datetime.now(timezone.utc).isoformat()}
+
+
+def live_chain(symbol: str, expiry: str | None) -> dict:
+    import yfinance as yf
+    t = yf.Ticker(symbol)
+    exps = list(t.options or [])
+    if not exps:
+        return {"symbol": symbol, "error": f"No listed options for {symbol} on Yahoo Finance."}
+    today = date.today()
+    exp = expiry if expiry in exps else pick_expiry(exps, today)
+    oc = t.option_chain(exp)
+    spot = None
+    try:
+        spot = _f(t.fast_info["last_price"])
+    except Exception:
+        pass
+    if not spot:
+        h = t.history(period="5d")
+        spot = _f(h["Close"].iloc[-1]) if len(h) else None
+    if not spot:
+        return {"symbol": symbol, "error": "Could not get the current share price."}
+    rate = DEFAULT_RATE
+    try:
+        irx = yf.Ticker("^IRX").history(period="5d")["Close"]
+        if len(irx):
+            rate = float(irx.iloc[-1]) / 100
+    except Exception:
+        pass
+
+    def rows(df):
+        out = []
+        for _, r in df.iterrows():
+            k = _f(r.get("strike"))
+            if k is None or not (spot * STRIKE_RANGE[0] <= k <= spot * STRIKE_RANGE[1]):
+                continue
+            out.append({"strike": k, "bid": _f(r.get("bid")), "ask": _f(r.get("ask")), "last": _f(r.get("lastPrice")),
+                        "iv": _f(r.get("impliedVolatility")), "volume": int(_f(r.get("volume")) or 0),
+                        "oi": int(_f(r.get("openInterest")) or 0)})
+        return out
+
+    return {"symbol": symbol, "spot": spot, "rate": rate, "expiry": exp, "dte": (date.fromisoformat(exp) - today).days,
+            "expirations": exps, "calls": rows(oc.calls), "puts": rows(oc.puts), "source": "yahoo",
+            "fetched": datetime.now(timezone.utc).isoformat()}
