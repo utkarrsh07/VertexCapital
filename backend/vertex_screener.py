@@ -277,7 +277,15 @@ def score_universe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 SIGNAL_TIERS = [(0.85, "STRONG BUY"), (0.65, "BUY"), (0.35, "HOLD"), (0.15, "REDUCE"), (0.0, "SELL")]
-W_ML, W_FUND = 0.55, 0.45
+W_ML, W_FUND = 0.55, 0.45      # default blend when no model evidence is available
+
+
+def evidence_weight(ic_t: float | None) -> float:
+    """Machine-learning share of the score, set by out-of-sample evidence: 25% with no edge (t <= 0),
+    rising with the IC t-statistic to a 65% cap at t >= 4. Fundamentals take the rest."""
+    if ic_t is None or not np.isfinite(ic_t):
+        return W_ML
+    return float(np.clip(0.25 + 0.10 * ic_t, 0.25, 0.65))
 MAX_NAMES = 20
 MAX_WEIGHT = 0.08
 MAX_SECTOR_WEIGHT = 0.25
