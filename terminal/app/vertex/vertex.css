@@ -694,6 +694,13 @@
 .vx-ol-main { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .vx-ol-exp { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .vx-ol-exp select { padding: 6px 8px; }
+.vx-ol-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.vx-ol-tabs button { text-align: left; padding: 10px 12px !important; border: 1px solid var(--line2) !important; border-radius: 3px; display: flex; flex-direction: column; gap: 3px; }
+.vx-ol-tabs button b { font-size: 13px; font-weight: 750; }
+.vx-ol-tabs button span { font-size: 11px; color: var(--mut); }
+.vx-ol-tabs button.on { border-color: var(--acc) !important; background: var(--sel) !important; }
+.vx-ol-tabs button.on b { color: var(--acc); }
+.vx-ol-tabs button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 @media (max-width: 1200px) {
   .vx-kpis { grid-template-columns: repeat(3, 1fr); }
   .vx-mgrid2, .vx-verdict { grid-template-columns: 1fr; }
