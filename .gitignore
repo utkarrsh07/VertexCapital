@@ -60,3 +60,16 @@ v20_4_history/
 v21_install/
 v21_1_install/
 v21_history/
+
+# local-only files (kept on disk, not on GitHub)
+/*.ps1
+v*_install/
+v*_history/
+polish_install/
+backend/quant_research_v15.py
+backend/research_validation_v16.py
+backend/upgrade14_engine.py
+backend/vertex_scanner_v17.py
+tests/test_quant_research_v15.py
+tests/test_research_validation_v16.py
+tests/test_upgrade14_engine.py
